@@ -152,6 +152,45 @@ function MainAppContent() {
     setLogs(prev => [{ time: timeStr, msg, type }, ...prev.slice(0, 49)])
   }, [])
 
+  const renderLogMessageWithLinks = (msg) => {
+    if (!msg) return null
+    const regex = /(0x[a-fA-F0-9]{64}|0x[a-fA-F0-9]{40})/g
+    const parts = msg.split(regex)
+
+    return parts.map((part, i) => {
+      if (part.match(/^0x[a-fA-F0-9]{64}$/)) {
+        return (
+          <a
+            key={i}
+            href={`https://explorer.ritualfoundation.org/tx/${part}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#45C7FF] underline font-bold hover:text-white inline-flex items-center gap-1 mx-1 transition-colors"
+            title="View Transaction on Ritual Explorer"
+          >
+            <span>{part.slice(0, 10)}...{part.slice(-6)}</span>
+            <ExternalLink className="w-3 h-3 inline text-[#45C7FF]" />
+          </a>
+        )
+      } else if (part.match(/^0x[a-fA-F0-9]{40}$/)) {
+        return (
+          <a
+            key={i}
+            href={`https://explorer.ritualfoundation.org/address/${part}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#00D26A] underline font-bold hover:text-white inline-flex items-center gap-1 mx-1 transition-colors"
+            title="View Address on Ritual Explorer"
+          >
+            <span>{part.slice(0, 8)}...{part.slice(-4)}</span>
+            <ExternalLink className="w-3 h-3 inline text-[#00D26A]" />
+          </a>
+        )
+      }
+      return part
+    })
+  }
+
   const fetchWalletBalance = useCallback(async (addr) => {
     if (!addr) {
       setWalletBalance(null)
@@ -225,7 +264,7 @@ function MainAppContent() {
         if (isCancelled) return
 
         if (sData.status === 'done' && sData.signal) {
-          addLog(`🎉 Ritual TEE Enclave (0x0802) settlement confirmed on-chain!`, 'hi')
+          addLog(`🎉 Ritual TEE Enclave (0x0802) settlement confirmed on-chain! Tx: ${pollingState?.txHash || ''}`, 'hi')
           const coinObj = coins.find(c => c.sym === selectedCoin)
           const currentCoinPrice = sData.signal?.current_price || coinObj?.price
           const newSignal = {
@@ -282,7 +321,7 @@ function MainAppContent() {
                 if (retryRes.ok) {
                   const retryData = await retryRes.json()
                   if (retryData.tx_hash) {
-                    addLog(`⚡ Auto-Retry Tx: ${retryData.tx_hash.slice(0, 20)}...`, 'hi')
+                    addLog(`⚡ Auto-Retry Tx: ${retryData.tx_hash}`, 'hi')
                     setPollingState({
                       txHash: retryData.tx_hash,
                       contractAddress: retryData.contract_address || '',
@@ -502,7 +541,7 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
         if (evalTx) setEvaluateTxHash(evalTx)
         if (cAddr) setContractAddress(cAddr)
 
-        addLog(`⚡ Submitted Tx: ${evalTx ? evalTx.slice(0, 18) : ''}... (req_id: ${reqId ? reqId.slice(0, 8) : ''})`, 'hi')
+        addLog(`⚡ Submitted Tx: ${evalTx || ''} (req_id: ${reqId ? reqId.slice(0, 8) : ''})`, 'hi')
         addLog(`⏳ Ritual TEE Enclave (0x0802) processing inference on Chain ID 1979...`, 'hi')
 
         setPollingState({
@@ -858,10 +897,10 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
                   <div className="text-slate-600 italic">Ready for evaluation input...</div>
                 ) : (
                   logs.map((l, idx) => (
-                    <div key={idx} className="flex gap-2">
+                    <div key={idx} className="flex gap-2 items-center flex-wrap">
                       <span className="text-slate-500">[{l.time}]</span>
                       <span className={l.type === 'error' ? 'text-rose-400' : l.type === 'hi' ? 'text-[#45C7FF]' : 'text-slate-300'}>
-                        {l.msg}
+                        {renderLogMessageWithLinks(l.msg)}
                       </span>
                     </div>
                   ))
