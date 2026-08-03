@@ -110,7 +110,9 @@ class RitualClient:
 
             if lock_until < cur_block + 500:
                 print(f"[RITUAL WALLET] Extending lock duration by {min_lock_blocks} blocks (cur block: {cur_block}, lock_until: {lock_until})...")
-                nonce = self.w3.eth.get_transaction_count(self.address, 'pending')
+                n1 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'latest')
+                n2 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'pending')
+                nonce = max(n1, n2)
                 base_fee = self.w3.eth.gas_price
                 priority_fee = self.w3.to_wei(2, 'gwei')
 
@@ -309,7 +311,9 @@ class RitualClient:
             raise ValueError("Ritual client initialized without private key")
 
         oracle = self.w3.eth.contract(address=to_checksum_address(oracle_address), abi=oracle_abi)
-        nonce = self.w3.eth.get_transaction_count(self.address, 'pending')
+        n1 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'latest')
+        n2 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'pending')
+        nonce = max(n1, n2)
 
         # EIP-1559 gas: 2.5x base fee + 2 gwei priority — ensures mempool inclusion
         base_fee = self.w3.eth.gas_price
@@ -355,7 +359,9 @@ class RitualClient:
             raise ValueError("Ritual client initialized without private key")
 
         llm_precompile = to_checksum_address(self.LLM_PRECOMPILE_ADDRESS)
-        nonce = self.w3.eth.get_transaction_count(self.address, 'pending')
+        n1 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'latest')
+        n2 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'pending')
+        nonce = max(n1, n2)
 
         base_fee = self.w3.eth.gas_price
         priority_fee = self.w3.to_wei(2, 'gwei')
@@ -435,7 +441,9 @@ class RitualClient:
         ]
 
         payload = encode(types, values)
-        nonce = self.w3.eth.get_transaction_count(self.address)
+        n1 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'latest')
+        n2 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'pending')
+        nonce = max(n1, n2)
         gas_price = self.w3.eth.gas_price
 
         tx_dict = {

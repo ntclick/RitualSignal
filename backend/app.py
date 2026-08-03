@@ -281,7 +281,9 @@ def pay_for_signal(body: PayRequest):
         treasury = client.w3.eth.contract(address=to_checksum_address(TREASURY_ADDRESS), abi=TREASURY_ABI)
         user_addr = to_checksum_address(body.user_identity) if body.user_identity and len(body.user_identity) == 42 else client.address
         
-        nonce = client.w3.eth.get_transaction_count(client.address)
+        n1 = client.w3.eth.get_transaction_count(to_checksum_address(client.address), 'latest')
+        n2 = client.w3.eth.get_transaction_count(to_checksum_address(client.address), 'pending')
+        nonce = max(n1, n2)
         gas_price = client.w3.eth.gas_price
 
         tx_dict = treasury.functions.payForSignal(user_addr, body.pair).build_transaction({
