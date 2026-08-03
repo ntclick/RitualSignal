@@ -239,7 +239,8 @@ def get_x402_quote(strategy: Optional[str] = None):
     }
 
 @app.get("/api/coins")
-async def get_coins():
+@app.get("/api/prices")
+async def get_coins(network: Optional[str] = "ritual_testnet"):
     cg_ids = ",".join([c["cg_id"] for c in COINS_MAP])
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_ids}&vs_currencies=usd&include_24hr_change=true"
     results = []
@@ -267,7 +268,7 @@ async def get_coins():
             {"sym": c["sym"], "pair": c["pair"], "name": c["name"], "price": "$1.00", "change": "+0.00%"}
             for c in COINS_MAP
         ]
-    return results
+    return {"prices": results, "coins": results, "status": "ok"}
 
 @app.post("/api/signal/pay")
 def pay_for_signal(body: PayRequest):
