@@ -17,6 +17,30 @@ const PRICE_REFRESH_INTERVAL_SEC = 600
 const RITUAL_CHAIN_ID_HEX = '0x7bb' // 1979 in Decimal
 const TREASURY_ADDRESS = '0x3d64Bfbd30aC0Bd1fcB3C80F2424b9988D7E451e'
 
+const encodePayForSignalData = (userStr, pairStr) => {
+  try {
+    const userBytes = new TextEncoder().encode(userStr)
+    const pairBytes = new TextEncoder().encode(pairStr)
+    const align32 = (len) => Math.ceil(len / 32) * 32
+    const userLen = userBytes.length
+    const pairLen = pairBytes.length
+    const userOffset = 64
+    const pairOffset = userOffset + 32 + align32(userLen)
+    const selector = 'da157c98'
+    const off1Hex = userOffset.toString(16).padStart(64, '0')
+    const off2Hex = pairOffset.toString(16).padStart(64, '0')
+    const uLenHex = userLen.toString(16).padStart(64, '0')
+    let uDataHex = Array.from(userBytes).map(b => b.toString(16).padStart(2, '0')).join('')
+    uDataHex = uDataHex.padEnd(align32(userLen) * 2, '0')
+    const pLenHex = pairLen.toString(16).padStart(64, '0')
+    let pDataHex = Array.from(pairBytes).map(b => b.toString(16).padStart(2, '0')).join('')
+    pDataHex = pDataHex.padEnd(align32(pairLen) * 2, '0')
+    return '0x' + selector + off1Hex + off2Hex + uLenHex + uDataHex + pLenHex + pDataHex
+  } catch (_) {
+    return '0x'
+  }
+}
+
 const RITUAL_NETWORK_PARAMS = {
   chainId: RITUAL_CHAIN_ID_HEX,
   chainName: 'Ritual Chain Testnet',
@@ -449,7 +473,7 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
     addLog(`Initiating Ritual Signal Evaluation for ${selectedCoin}/USDT (${timeframe.toUpperCase()})...`, 'hi')
 
     try {
-      let userSig = null
+      let userPayTxHash = null
       let signingWalletAddr = connectedWallet
 
       if (window.ethereum) {
@@ -472,34 +496,31 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
             }
           }
 
-          // ── X402 Micropayment Signature Caching (Until Logout) ──
-          const cachedSigKey = `${LOCAL_STORAGE_SESSION_SIG_KEY}_${signingWalletAddr}`
-          const cachedSig = localStorage.getItem(cachedSigKey)
+          // ── Direct MetaMask On-Chain Transaction Popup (0.05 RITUAL) ──
+          setExecutionStep('Please confirm 0.05 RITUAL transaction in MetaMask...')
+          addLog(`🦊 Popping up MetaMask to pay 0.05 RITUAL fee to SignalTreasury...`, 'hi')
 
-          if (cachedSig) {
-            userSig = cachedSig
-            addLog(`⚡ Using active X402 session authorization (cached until Logout)`, 'info')
-          } else {
-            setExecutionStep('Please sign X402 micropayment authorization in MetaMask (Once per session)...')
-            addLog(`Popping up MetaMask for X402 authorization signature (0.05 RITUAL)...`, 'hi')
+          const encodedCalldata = encodePayForSignalData(signingWalletAddr, `${selectedCoin}/USDT`)
 
-            const signMessage = `RitualSignal X402 Micropayment Authorization\n-----------------------------------\nAuthorized Wallet: ${signingWalletAddr}\nFee: 0.05 RITUAL\nChain ID: 1979 (Ritual Testnet)\nSession: Active until Disconnect`
+          userPayTxHash = await window.ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: signingWalletAddr,
+              to: TREASURY_ADDRESS,
+              value: '0x0B1A2BC2EC50000', // 0.05 RITUAL in wei (50,000,000,000,000,000)
+              data: encodedCalldata
+            }]
+          })
 
-            userSig = await window.ethereum.request({
-              method: 'personal_sign',
-              params: [signMessage, signingWalletAddr]
-            })
-
-            if (userSig) {
-              localStorage.setItem(cachedSigKey, userSig)
-              addLog(`✅ User signed X402 authorization! Cached for session. Sig: ${userSig.slice(0, 16)}...`, 'hi')
-            }
+          if (userPayTxHash) {
+            setPaymentTxHash(userPayTxHash)
+            addLog(`✅ User paid 0.05 RITUAL via MetaMask! Tx: ${userPayTxHash}`, 'hi')
           }
-        } catch (sigErr) {
-          if (sigErr.code === 4001) {
-            throw new Error('Transaction/Signature cancelled in MetaMask by user.')
+        } catch (txErr) {
+          if (txErr.code === 4001) {
+            throw new Error('Transaction cancelled in MetaMask by user.')
           }
-          console.warn('MetaMask sign warning:', sigErr)
+          console.warn('MetaMask transaction warning:', txErr)
         }
       }
 
@@ -519,7 +540,7 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
           strategy: strategy,
           network: activeNetwork,
           user_identity: activeAddress,
-          payment_tx: `0x_ritual_x402_${Date.now().toString(16)}`,
+          payment_tx: userPayTxHash || '',
           user_signature: userSig || '0x_ritual_auto'
         })
       })
