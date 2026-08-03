@@ -541,7 +541,7 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
           network: activeNetwork,
           user_identity: activeAddress,
           payment_tx: userPayTxHash || '',
-          user_signature: userSig || '0x_ritual_auto'
+          user_signature: userPayTxHash || '0x_ritual_auto'
         })
       })
 
