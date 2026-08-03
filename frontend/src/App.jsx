@@ -886,9 +886,23 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
               </h4>
 
               {loading && executionStep && (
-                <div className="mb-4 p-3 rounded-xl bg-[#6D5EF5]/10 border border-[#6D5EF5]/30 text-[#8F78FF] text-xs font-mono flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#45C7FF]" />
-                  <span>{executionStep}</span>
+                <div className="mb-4 p-3 rounded-xl bg-[#6D5EF5]/10 border border-[#6D5EF5]/30 text-[#8F78FF] text-xs font-mono flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#45C7FF]" />
+                    <span>{executionStep}</span>
+                  </div>
+                  {evaluateTxHash && (
+                    <a
+                      href={`https://explorer.ritualfoundation.org/tx/${evaluateTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-[#45C7FF]/10 border border-[#45C7FF]/30 text-[#45C7FF] hover:bg-[#45C7FF]/20 font-bold inline-flex items-center gap-1 text-xs transition-colors"
+                      title="View Tx on Ritual Explorer"
+                    >
+                      <span>Tx: {evaluateTxHash.slice(0, 8)}...{evaluateTxHash.slice(-6)}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               )}
 
