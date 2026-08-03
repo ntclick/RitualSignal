@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ritualsignal-backend
+    env: python
+    region: singapore
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: RITUAL_RPC_URL
+        value: https://rpc.ritualfoundation.org
+      - key: RITUAL_CHAIN_ID
+        value: "1979"
+      - key: TREASURY_CONTRACT_ADDRESS
+        value: 0x3d64Bfbd30aC0Bd1fcB3C80F2424b9988D7E451e
+      - key: ORACLE_CONTRACT_ADDRESS
+        value: 0x92C5e233f529C0c8Cf8CB4c538907c6579021971
+      - key: TEE_EXECUTOR_ADDRESS
+        value: 0xB42e435c4252A5a2E7440e37B609F00c61a0c91B
+      - key: RITUAL_PRIVATE_KEY
+        sync: false
