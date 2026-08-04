@@ -141,6 +141,7 @@ class EvaluateRequest(BaseModel):
     user_identity: Optional[str] = ""
     payment_tx: Optional[str] = ""
     user_signature: Optional[str] = ""
+    execution_model: Optional[str] = "0x0802"
 
 class PayRequest(BaseModel):
     user_identity: str
@@ -504,7 +505,19 @@ async def evaluate_signal(body: EvaluateRequest):
     }
 
 
-def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: str, last_price: float, rsi_14: float, ema_trend: str, rvol: float, atr_14: float):
+def format_price_precision_num(val: float) -> float:
+    if val <= 0:
+        return 0.0
+    if val < 0.0001:
+        return round(val, 8)
+    if val < 0.01:
+        return round(val, 6)
+    if val < 1.0:
+        return round(val, 4)
+    return round(val, 2)
+
+
+def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: str, last_price: float, rsi_14: float, ema_trend: str, rvol: float, atr_14: float, execution_model: str = "0x0802"):
     if rsi_14 >= 55 and "Bullish" in str(ema_trend):
         verdict = "Long"
         confidence = min(92, max(65, int(55 + (rsi_14 - 50) * 1.5 + (rvol - 1.0) * 10)))
@@ -521,22 +534,30 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
         tp_mult = 1.02
         sl_mult = 0.99
 
-    entry = round(last_price, 4) if last_price < 10 else round(last_price, 2)
-    tp = round(last_price * tp_mult, 4) if last_price < 10 else round(last_price * tp_mult, 2)
-    sl = round(last_price * sl_mult, 4) if last_price < 10 else round(last_price * sl_mult, 2)
-    rr = round(abs(tp - entry) / (abs(entry - sl) or 0.001), 2)
+    entry = format_price_precision_num(last_price)
+    tp = format_price_precision_num(last_price * tp_mult)
+    sl = format_price_precision_num(last_price * sl_mult)
+    rr = round(abs(tp - entry) / (abs(entry - sl) or 0.000001), 2)
+
+    model_names = {
+        "0x0802": "Ritual LLM Precompile (0x0802 Short-Running TEE)",
+        "0x080C": "Ritual Sovereign Agent (0x080C Task-Based Multi-Turn)",
+        "0x0820": "Ritual Persistent Agent (0x0820 Autonomous 24/7 Service)",
+        "0x0801": "Ritual HTTP Call Precompile (0x0801 Enshrined Oracle)"
+    }
+    source_type = model_names.get(execution_model, "Ritual LLM Precompile (0x0802 TEE Enclave)")
 
     return {
         "verdict": verdict,
         "confidence": confidence,
         "current_price": last_price,
-        "expert_summary": f"Quant Rubric analysis for {symbol} ({timeframe.upper()}) shows {verdict.upper()} structure with RSI(14) at {rsi_14:.1f} and {ema_trend}.",
+        "expert_summary": f"Quant Rubric analysis for {symbol} ({timeframe.upper()}) via {source_type} shows {verdict.upper()} structure with RSI(14) at {rsi_14:.1f} and {ema_trend}.",
         "supporting": [
             f"RSI(14) momentum at {rsi_14:.1f} aligns with {verdict.lower()} directional bias.",
             f"EMA Trend structure: {ema_trend} with {rvol:.2f}x volume relative factor."
         ],
-        "counterpoint": f"ATR(14) volatility at ${atr_14:,.2f} requires strict stop loss placement at ${sl:,.2f}.",
-        "invalidation": f"Price close below ${sl:,.2f} invalidates quantitative setup.",
+        "counterpoint": f"ATR(14) volatility at ${atr_14:,.6g} requires strict stop loss placement at ${sl}.",
+        "invalidation": f"Price close below ${sl} invalidates quantitative setup.",
         "trade": {
             "entry": entry,
             "takeProfit": tp,
@@ -544,7 +565,7 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
             "riskReward": rr
         },
         "source": "Binance OHLCV Klines",
-        "source_type": "Ritual LLM Precompile (0x0802 TEE Enclave)"
+        "source_type": source_type
     }
 
 
@@ -611,7 +632,8 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
             rsi_14=cached.get("rsi_14", 58.4),
             ema_trend=cached.get("ema_trend", "Bullish stack (price > EMA9 > EMA20 > EMA50)"),
             rvol=cached.get("rvol", 1.45),
-            atr_14=cached.get("atr_14", 1240.50)
+            atr_14=cached.get("atr_14", 1240.50),
+            execution_model=cached.get("execution_model", "0x0802")
         )
         fallback_signal["request_id"] = request_id
         fallback_signal["tx_hash"] = clean_hash

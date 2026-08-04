@@ -6,6 +6,7 @@ import {
 
 export const TradingViewLightweightChart = ({
   symbol = 'BTCUSDT',
+  timeframe = '4h',
   currentPrice = 1.0,
   overlays = [],
   tradeData = null
@@ -16,11 +17,8 @@ export const TradingViewLightweightChart = ({
   useEffect(() => {
     if (!chartContainerRef.current) return
 
-    // Clean up previous instance safely
     if (chartRef.current) {
-      try {
-        chartRef.current.remove()
-      } catch (e) {}
+      try { chartRef.current.remove() } catch (e) {}
       chartRef.current = null
     }
 
@@ -28,7 +26,6 @@ export const TradingViewLightweightChart = ({
     if (!container) return
 
     try {
-      // Initialize TradingView Chart
       const chart = createChart(container, {
         width: container.clientWidth || 600,
         height: 340,
@@ -58,7 +55,6 @@ export const TradingViewLightweightChart = ({
 
       chartRef.current = chart
 
-      // Add Candlestick Series (v5 addSeries / v4 addCandlestickSeries fallback)
       const candleOptions = {
         upColor: '#10b981',
         downColor: '#f43f5e',
@@ -74,7 +70,6 @@ export const TradingViewLightweightChart = ({
 
       if (!candleSeries) return
 
-      // Add Volume Histogram Series on a separate scale to keep it at the bottom
       const volumeOptions = {
         color: '#3b82f6',
         priceFormat: { type: 'volume' },
@@ -87,28 +82,102 @@ export const TradingViewLightweightChart = ({
 
       if (chart.priceScale) {
         chart.priceScale('volume').applyOptions({
-          scaleMargins: {
-            top: 0.8, // Constrain volume bars to the bottom 20% of chart
-            bottom: 0
-          }
+          scaleMargins: { top: 0.8, bottom: 0 }
         })
       }
 
-      // Helper function to format price labels on chart lines appropriately
       const formatChartPriceLabel = (val) => {
-        if (!val || isNaN(val)) return '0.00'
+        if (!val || isNaN(val) || val <= 0) return '0.00'
         const num = Number(val)
-        if (num < 0.00001) return num.toFixed(8)
-        if (num < 0.001) return num.toFixed(6)
+        if (num < 0.0001) return num.toFixed(8)
+        if (num < 0.01) return num.toFixed(6)
         if (num < 1) return num.toFixed(4)
         return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       }
 
-      // Fetch real live Binance OHLCV candles via server-side API or direct fallback
       const cleanSym = (symbol || 'BTCUSDT').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
       const interval = (timeframe || '4h').toLowerCase()
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8001'
       const klinesEndpoint = `${backendUrl}/api/klines?symbol=${cleanSym}&interval=${interval}&limit=60`
+
+      const renderDataAndOverlays = (loadedCandles, loadedVolume) => {
+        if (candleSeries && typeof candleSeries.setData === 'function') {
+          candleSeries.setData(loadedCandles)
+        }
+        if (volumeSeries && typeof volumeSeries.setData === 'function') {
+          volumeSeries.setData(loadedVolume)
+        }
+
+        const basePrice = loadedCandles.length > 0 ? loadedCandles[loadedCandles.length - 1].close : Number(currentPrice || 1.0)
+
+        // Entry, TP, SL price lines
+        const entryVal = Number(tradeData?.entry || basePrice) || basePrice
+        const tpVal = Number(tradeData?.takeProfit || basePrice * 1.057) || (basePrice * 1.057)
+        const slVal = Number(tradeData?.stopLoss || basePrice * 0.978) || (basePrice * 0.978)
+
+        if (typeof candleSeries.createPriceLine === 'function') {
+          candleSeries.createPriceLine({
+            price: entryVal,
+            color: '#3b82f6',
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `ENTRY $${formatChartPriceLabel(entryVal)}`
+          })
+          candleSeries.createPriceLine({
+            price: tpVal,
+            color: '#10b981',
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `TP $${formatChartPriceLabel(tpVal)}`
+          })
+          candleSeries.createPriceLine({
+            price: slVal,
+            color: '#f43f5e',
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `SL $${formatChartPriceLabel(slVal)}`
+          })
+        }
+
+        // EMA lines calculation
+        const calculateEMA = (period) => {
+          if (loadedCandles.length === 0) return []
+          const k = 2 / (period + 1)
+          let ema = loadedCandles[0].close
+          const emaData = []
+          for (let i = 0; i < loadedCandles.length; i++) {
+            ema = loadedCandles[i].close * k + ema * (1 - k)
+            emaData.push({ time: loadedCandles[i].time, value: ema })
+          }
+          return emaData
+        }
+
+        const emaPeriods = [20, 50]
+        const colorMap = { 20: '#06b6d4', 50: '#a855f7', 200: '#f59e0b' }
+        emaPeriods.forEach((period) => {
+          try {
+            const lineOptions = {
+              color: colorMap[period] || '#3b82f6',
+              lineWidth: 1,
+              title: `EMA ${period}`
+            }
+            const emaLine = typeof chart.addSeries === 'function'
+              ? chart.addSeries(LineSeries, lineOptions)
+              : (typeof chart.addLineSeries === 'function' ? chart.addLineSeries(lineOptions) : null)
+
+            if (emaLine && typeof emaLine.setData === 'function') {
+              emaLine.setData(calculateEMA(period))
+            }
+          } catch (_) {}
+        })
+
+        if (chart.timeScale && typeof chart.timeScale().fitContent === 'function') {
+          try { chart.timeScale().fitContent() } catch (e) {}
+        }
+      }
 
       fetch(klinesEndpoint)
         .then(res => res.json())
@@ -126,12 +195,7 @@ export const TradingViewLightweightChart = ({
               value: c.volume,
               color: c.close >= c.open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
             }))
-            if (candleSeries && typeof candleSeries.setData === 'function') {
-              candleSeries.setData(candles)
-            }
-            if (volumeSeries && typeof volumeSeries.setData === 'function') {
-              volumeSeries.setData(volumeData)
-            }
+            renderDataAndOverlays(candles, volumeData)
           } else {
             throw new Error('Fallback to direct Binance')
           }
@@ -153,111 +217,16 @@ export const TradingViewLightweightChart = ({
                   value: parseFloat(k[5]),
                   color: parseFloat(k[4]) >= parseFloat(k[1]) ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
                 }))
-                if (candleSeries && typeof candleSeries.setData === 'function') {
-                  candleSeries.setData(candles)
-                }
-                if (volumeSeries && typeof volumeSeries.setData === 'function') {
-                  volumeSeries.setData(volumeData)
-                }
+                renderDataAndOverlays(candles, volumeData)
               }
             })
             .catch(() => {})
         })
 
-      // Calculate EMA data helper
-      const calculateEMA = (period) => {
-        const k = 2 / (period + 1)
-        let ema = candles[0].close
-        const emaData = []
-        for (let i = 0; i < candles.length; i++) {
-          ema = candles[i].close * k + ema * (1 - k)
-          emaData.push({ time: candles[i].time, value: ema })
-        }
-        return emaData
-      }
-
-      // ── DYNAMIC OVERLAY ENGINE ──────────────────────────────────────────
-      const effectiveOverlays = overlays && overlays.length > 0 ? overlays : [
-        { type: 'entry', price: tradeData?.entry || basePrice },
-        { type: 'tp', price: tradeData?.takeProfit || basePrice * 1.057 },
-        { type: 'sl', price: tradeData?.stopLoss || basePrice * 0.978 },
-        { type: 'ema', period: 20 },
-        { type: 'ema', period: 50 }
-      ]
-
-      effectiveOverlays.forEach((ov) => {
-        try {
-          const typeStr = (ov.type || '').toLowerCase()
-
-          if (typeStr === 'entry') {
-            const entryVal = Number(ov.price || tradeData?.entry || basePrice) || basePrice
-            if (typeof candleSeries.createPriceLine === 'function') {
-              candleSeries.createPriceLine({
-                price: entryVal,
-                color: '#3b82f6',
-                lineWidth: 2,
-                lineStyle: LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: `ENTRY $${formatChartPriceLabel(entryVal)}`
-              })
-            }
-          } else if (typeStr === 'tp' || typeStr === 'take_profit') {
-            const tpVal = Number(ov.price || tradeData?.takeProfit || basePrice * 1.057) || (basePrice * 1.057)
-            if (typeof candleSeries.createPriceLine === 'function') {
-              candleSeries.createPriceLine({
-                price: tpVal,
-                color: '#10b981',
-                lineWidth: 2,
-                lineStyle: LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: `TP $${formatChartPriceLabel(tpVal)}`
-              })
-            }
-          } else if (typeStr === 'sl' || typeStr === 'stop_loss') {
-            const slVal = Number(ov.price || tradeData?.stopLoss || basePrice * 0.978) || (basePrice * 0.978)
-            if (typeof candleSeries.createPriceLine === 'function') {
-              candleSeries.createPriceLine({
-                price: slVal,
-                color: '#f43f5e',
-                lineWidth: 2,
-                lineStyle: LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: `SL $${formatChartPriceLabel(slVal)}`
-              })
-            }
-          } else if (typeStr === 'ema') {
-            const period = ov.period || 20
-            const colorMap = { 20: '#06b6d4', 50: '#a855f7', 200: '#f59e0b' }
-            const lineOptions = {
-              color: colorMap[period] || '#3b82f6',
-              lineWidth: 1,
-              title: `EMA ${period}`
-            }
-
-            const emaLine = typeof chart.addSeries === 'function'
-              ? chart.addSeries(LineSeries, lineOptions)
-              : (typeof chart.addLineSeries === 'function' ? chart.addLineSeries(lineOptions) : null)
-
-            if (emaLine && typeof emaLine.setData === 'function') {
-              emaLine.setData(calculateEMA(period))
-            }
-          }
-        } catch (ovErr) {
-          // Prevent any individual overlay error from breaking chart rendering
-        }
-      })
-
-      // Auto-fit content
-      if (chart.timeScale && typeof chart.timeScale().fitContent === 'function') {
-        try {
-          chart.timeScale().fitContent()
-        } catch (e) {}
-      }
     } catch (chartErr) {
       console.warn('[Chart Engine Note]:', chartErr)
     }
 
-    // Handle Window Resize
     const handleResize = () => {
       if (container && chartRef.current) {
         try {
@@ -271,13 +240,11 @@ export const TradingViewLightweightChart = ({
     return () => {
       window.removeEventListener('resize', handleResize)
       if (chartRef.current) {
-        try {
-          chartRef.current.remove()
-        } catch (e) {}
+        try { chartRef.current.remove() } catch (e) {}
         chartRef.current = null
       }
     }
-  }, [symbol, currentPrice, JSON.stringify(overlays), JSON.stringify(tradeData)])
+  }, [symbol, timeframe, currentPrice, JSON.stringify(overlays), JSON.stringify(tradeData)])
 
   return (
     <div
@@ -291,7 +258,6 @@ export const TradingViewLightweightChart = ({
         padding: 16
       }}
     >
-      {/* Chart Top Indicator Header */}
       <div
         style={{
           display: 'flex',
@@ -304,17 +270,18 @@ export const TradingViewLightweightChart = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontWeight: 800, color: '#fff', fontSize: 13 }}>{symbol} 4H</span>
+          <span style={{ fontWeight: 800, color: '#fff', fontSize: 13 }}>{symbol} {timeframe.toUpperCase()}</span>
           <span style={{ color: '#06b6d4' }}>● EMA 20</span>
           <span style={{ color: '#a855f7' }}>● EMA 50</span>
-          <span style={{ color: '#f59e0b' }}>● EMA 200</span>
+          <span style={{ color: '#3b82f6' }}>● ENTRY</span>
+          <span style={{ color: '#10b981' }}>● TP</span>
+          <span style={{ color: '#f43f5e' }}>● SL</span>
         </div>
         <div style={{ color: 'var(--text-muted)' }}>
           Interactive TradingView Engine
         </div>
       </div>
 
-      {/* TradingView Chart Container Element */}
       <div ref={chartContainerRef} style={{ width: '100%', height: 340 }} />
     </div>
   )
