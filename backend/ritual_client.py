@@ -326,12 +326,17 @@ class RitualClient:
         priority_fee = self.w3.to_wei(2, 'gwei')
         max_fee = int(base_fee * 2.5) + priority_fee
 
-        tx_dict = oracle.functions.evaluateSignal(
-            llm_payload,
-            request_id,
-            symbol,
-            pair
-        ).build_transaction({
+        if hasattr(oracle.functions, "callLLMInference"):
+            tx_func = oracle.functions.callLLMInference(llm_payload)
+        else:
+            tx_func = oracle.functions.evaluateSignal(
+                llm_payload,
+                request_id,
+                symbol,
+                pair
+            )
+
+        tx_dict = tx_func.build_transaction({
             'from': self.address,
             'nonce': nonce,
             'gas': 4_000_000,

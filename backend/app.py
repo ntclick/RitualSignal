@@ -34,8 +34,8 @@ load_dotenv(dotenv_path=pathlib.Path(__file__).parent.parent / ".env")
 RITUAL_RPC_URL = os.getenv("RITUAL_RPC_URL", "https://rpc.ritualfoundation.org")
 PRIVATE_KEY    = os.getenv("RITUAL_PRIVATE_KEY", "")
 
-ORACLE_ADDRESS   = os.getenv("ORACLE_CONTRACT_ADDRESS", "")
-TREASURY_ADDRESS = os.getenv("TREASURY_CONTRACT_ADDRESS", "")
+ORACLE_ADDRESS   = os.getenv("ORACLE_CONTRACT_ADDRESS", "0xCc5495dF16633c0D0C189a71Ed3A723C2687dAE1")
+TREASURY_ADDRESS = os.getenv("TREASURY_CONTRACT_ADDRESS", "0x3d64Bfbd30aC0Bd1fcB3C80F2424b9988D7E451e")
 TEE_EXECUTOR     = os.getenv("TEE_EXECUTOR_ADDRESS", None)  # None = use dynamic discovery from TEEServiceRegistry
 
 NATIVE_TOKEN_SYMBOL = "RITUAL"

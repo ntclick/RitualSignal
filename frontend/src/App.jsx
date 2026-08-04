@@ -490,7 +490,7 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
       addLog(`1. Fetching live Binance OHLCV data & computing indicators for ${selectedCoin}/USDT (${timeframe.toUpperCase()})...`, 'info')
       addLog(`2. Validating Input JSON Schema & OpenAI format...`, 'info')
       addLog(`3. Discovered LLM Executor 0xB42e435c4252A5a2E7440e37B609F00c61a0c91B. Encoded 30-field 0x0802 payload`, 'hi')
-      addLog(`4. Submitting Transaction to SignalOracle (0x92C5e233...) on Ritual Chain (ID 1979)...`, 'hi')
+      addLog(`4. Submitting Transaction to SignalOracle (0xCc5495...) on Ritual Chain (ID 1979)...`, 'hi')
 
       const activeAddress = signingWalletAddr || connectedWallet || '0xe1966fcb8c2018Ff18f7bE7A92F7E5fB09776bC2'
       const activeCoinObj = coins.find(c => c.sym === selectedCoin) || PRESET_COINS.find(c => c.sym === selectedCoin)

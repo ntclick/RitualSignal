@@ -3,6 +3,23 @@
     {
       "inputs": [
         {
+          "name": "input",
+          "type": "bytes"
+        }
+      ],
+      "name": "callLLMInference",
+      "outputs": [
+        {
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "_teeExecutor",
           "type": "address"
@@ -377,5 +394,5 @@
       "type": "function"
     }
   ],
-  "address": "0x92C5e233f529C0c8Cf8CB4c538907c6579021971"
+  "address": "0xCc5495dF16633c0D0C189a71Ed3A723C2687dAE1"
 }
