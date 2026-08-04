@@ -24,10 +24,26 @@ class RitualClient:
     - Short-running async: result is in spcCalls[0].output of the settled receipt
     """
 
-    LLM_PRECOMPILE_ADDRESS   = "0x0000000000000000000000000000000000000802"
-    RITUAL_WALLET_ADDRESS    = "0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948"
-    TEE_SERVICE_REGISTRY     = "0x9644e8562cE0Fe12b4deeC4163c064A8862Bf47F"
-    CAPABILITY_LLM           = 1  # Capability enum: LLM = 1
+    LLM_PRECOMPILE_ADDRESS        = "0x0000000000000000000000000000000000000802"
+    HTTP_PRECOMPILE_ADDRESS       = "0x0000000000000000000000000000000000000801"
+    LONG_RUNNING_HTTP_PRECOMPILE  = "0x0000000000000000000000000000000000000805"
+    SOVEREIGN_AGENT_PRECOMPILE    = "0x000000000000000000000000000000000000080C"
+    DKMS_KEY_PRECOMPILE           = "0x000000000000000000000000000000000000081B"
+    PERSISTENT_AGENT_PRECOMPILE   = "0x0000000000000000000000000000000000000820"
+
+    RITUAL_WALLET_ADDRESS         = "0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948"
+    ASYNC_JOB_TRACKER_ADDRESS     = "0xC069FFCa0389f44eCA2C626e55491b0ab045AEF5"
+    ASYNC_DELIVERY_ADDRESS        = "0x5A16214fF555848411544b005f7Ac063742f39F6"
+    TEE_SERVICE_REGISTRY          = "0x9644e8562cE0Fe12b4deeC4163c064A8862Bf47F"
+    SCHEDULER_ADDRESS             = "0x56e776BAE2DD60664b69Bd5F865F1180ffB7D58B"
+    SECRETS_ACCESS_CONTROL        = "0xf9BF1BC8A3e79B9EBeD0fa2Db70D0513fecE32FD"
+    HEARTBEAT_CHAIN_CONTRACT      = "0xEF505E801f1Db392B5289690E2ffc20e840A3aCa"
+
+    SOVEREIGN_AGENT_FACTORY       = "0x9dC4C054e53bCc4Ce0A0Ff09E890A7a8e817f304"
+    PERSISTENT_AGENT_FACTORY      = "0xD4AA9D55215dc8149Af57605e70921Ea16b73591"
+
+    CAPABILITY_HTTP_CALL          = 0  # Capability enum: HTTP_CALL = 0
+    CAPABILITY_LLM                = 1  # Capability enum: LLM = 1
 
     TEE_REGISTRY_ABI = [
         {
@@ -136,12 +152,12 @@ class RitualClient:
 
         return True
 
-    def get_llm_executor(self) -> str:
+    def get_tee_executor(self, capability: int = 1) -> str:
         """
-        Dynamically discovers a live LLM executor from TEEServiceRegistry.
-        Uses Capability.LLM = 1 and checkValidity=True to filter to healthy nodes.
+        Dynamically discovers a live TEE executor from TEEServiceRegistry.
+        Capability: 0 = HTTP_CALL / Agents, 1 = LLM
+        Uses checkValidity=True to filter to healthy nodes.
         Falls back to TEE_EXECUTOR_ADDRESS env var if registry query fails.
-        NEVER returns address(0) — that causes RPC -32602 error.
         """
         fallback = os.getenv("TEE_EXECUTOR_ADDRESS", "0xB42e435c4252A5a2E7440e37B609F00c61a0c91B")
         try:
@@ -149,18 +165,20 @@ class RitualClient:
                 address=to_checksum_address(self.TEE_SERVICE_REGISTRY),
                 abi=self.TEE_REGISTRY_ABI
             )
-            services = registry.functions.getServicesByCapability(self.CAPABILITY_LLM, True).call()
+            services = registry.functions.getServicesByCapability(capability, True).call()
             valid = [s for s in services if s[1]]  # s[1] = isValid
             if not valid:
-                print(f"[EXECUTOR DISCOVERY] No valid LLM executors found — using fallback {fallback}")
+                print(f"[EXECUTOR DISCOVERY] No valid executors found for capability {capability} — using fallback {fallback}")
                 return fallback
-            # Pick first valid executor's teeAddress (s[0] = node tuple, s[0][1] = teeAddress)
             chosen = valid[0][0][1]
-            print(f"[EXECUTOR DISCOVERY] Found {len(valid)} LLM executor(s). Using: {chosen}")
+            print(f"[EXECUTOR DISCOVERY] Found {len(valid)} valid executor(s) for capability {capability}. Using: {chosen}")
             return chosen
         except Exception as e:
             print(f"[EXECUTOR DISCOVERY] Registry query failed ({e}) — using fallback {fallback}")
             return fallback
+
+    def get_llm_executor(self) -> str:
+        return self.get_tee_executor(capability=self.CAPABILITY_LLM)
 
     def encode_llm_payload(
         self,
