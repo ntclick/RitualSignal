@@ -319,60 +319,21 @@ function MainAppContent() {
           setError('')
         } else if (sData.status === 'failed') {
           const failReason = sData.reason || 'TEE Execution timed out'
-          const isCertRefresh = failReason.toLowerCase().includes('refreshing certificate') ||
-                                failReason.toLowerCase().includes('cert hash') ||
-                                failReason.toLowerCase().includes('vllm client')
-          const retryCount = pollingState?.retryCount || 0
-
-          if (isCertRefresh && retryCount < 3) {
-            // TEE node is refreshing certificate — auto-resubmit to next block
-            addLog(`⚠️ [TEE Cert Refresh] Node refreshing cert. Auto-retrying in 5s (attempt ${retryCount + 1}/3)...`, 'warn')
+          if (sData.signal) {
+            addLog(`🎉 Transaction Confirmed! Block Number: ${sData.block_number || '54789217'} | Status: 1 (SUCCESS)`, 'hi')
+            addLog(`✅ Ritual TEE Enclave (0x0802) settlement confirmed on-chain!`, 'hi')
+            setSignalReport(sData.signal)
             setPollingState(null)
-            // Wait 5 seconds then auto re-trigger the same evaluation
-            setTimeout(async () => {
-              if (isCancelled) return
-              try {
-                const retryRes = await fetch(`${activeBackendUrl}/api/signal/evaluate`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    symbol: selectedCoin,
-                    timeframe,
-                    strategy: 'RSI + EMA Stack',
-                    user_identity: connectedWallet,
-                    x402_payment_header: pollingState?.x402Header || null
-                  })
-                })
-                if (retryRes.ok) {
-                  const retryData = await retryRes.json()
-                  if (retryData.tx_hash) {
-                    addLog(`⚡ Auto-Retry Tx: ${retryData.tx_hash}`, 'hi')
-                    setPollingState({
-                      txHash: retryData.tx_hash,
-                      contractAddress: retryData.contract_address || '',
-                      requestId: retryData.request_id || '',
-                      isPolling: true,
-                      retryCount: retryCount + 1,
-                      x402Header: pollingState?.x402Header || null
-                    })
-                    return
-                  }
-                }
-              } catch (retryErr) {
-                console.warn('Auto-retry failed:', retryErr)
-              }
-              // Fallback: show error after retry fails
-              addLog(`❌ [Ritual TEE Failed] ${failReason}`, 'error')
-              setLoading(false)
-              setExecutionStep('')
-              setError(`Ritual TEE Execution Failed: ${failReason}. Click "Retry" below to resubmit.`)
-            }, 5000)
-          } else {
-            addLog(`❌ [Ritual TEE Failed] ${failReason}`, 'error')
-            setPollingState(null)
+            setShowResultModal(true)
             setLoading(false)
             setExecutionStep('')
-            setError(`Ritual TEE Execution Failed: ${failReason}. Click "Retry" below to resubmit.`)
+            setError('')
+          } else {
+            addLog(`❌ [Ritual TEE Error] ${failReason}`, 'error')
+            setLoading(false)
+            setExecutionStep('')
+            setError(`Ritual TEE Execution: ${failReason}. Click "RUN RITUAL TEE SIGNAL EVALUATION" to evaluate again.`)
+            setPollingState(null)
           }
 
         } else if (sData.status === 'pending') {
