@@ -104,38 +104,67 @@ export const TradingViewLightweightChart = ({
         return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       }
 
-      // Generate synthetic historical candles around currentPrice
+      // Fetch real live Binance OHLCV candles for the exact symbol and timeframe
+      const cleanSym = (symbol || 'BTCUSDT').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+      const interval = (timeframe || '4h').toLowerCase()
       const basePrice = Number(currentPrice) && Number(currentPrice) > 0 ? Number(currentPrice) : 1.0
-      const nowSec = Math.floor(Date.now() / 1000)
-      const candles = []
-      const volumeData = []
-      let price = basePrice * 0.95
 
-      for (let i = 40; i >= 0; i--) {
-        const time = nowSec - i * 4 * 3600
-        const change = (Math.random() - 0.48) * (basePrice * 0.015)
-        const open = price
-        const close = open + change
-        const high = Math.max(open, close) + Math.random() * (basePrice * 0.008)
-        const low = Math.min(open, close) - Math.random() * (basePrice * 0.008)
-        price = close
+      let candles = []
+      let volumeData = []
 
-        candles.push({ time, open, high, low, close })
-        volumeData.push({
-          time,
-          value: Math.round(1000 + Math.random() * 5000),
-          color: close >= open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${cleanSym}&interval=${interval}&limit=60`)
+        .then(res => {
+          if (res.ok) return res.json()
+          throw new Error('Binance API fallback')
         })
-      }
-
-      candles[candles.length - 1].close = basePrice
-
-      if (typeof candleSeries.setData === 'function') {
-        candleSeries.setData(candles)
-      }
-      if (volumeSeries && typeof volumeSeries.setData === 'function') {
-        volumeSeries.setData(volumeData)
-      }
+        .then(klines => {
+          if (Array.isArray(klines) && klines.length > 0) {
+            candles = klines.map(k => ({
+              time: Math.floor(k[0] / 1000),
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4])
+            }))
+            volumeData = klines.map(k => ({
+              time: Math.floor(k[0] / 1000),
+              value: parseFloat(k[5]),
+              color: parseFloat(k[4]) >= parseFloat(k[1]) ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+            }))
+            if (candleSeries && typeof candleSeries.setData === 'function') {
+              candleSeries.setData(candles)
+            }
+            if (volumeSeries && typeof volumeSeries.setData === 'function') {
+              volumeSeries.setData(volumeData)
+            }
+          }
+        })
+        .catch(_ => {
+          // Synthetic fallback if offline
+          const nowSec = Math.floor(Date.now() / 1000)
+          let price = basePrice * 0.95
+          for (let i = 40; i >= 0; i--) {
+            const time = nowSec - i * 4 * 3600
+            const change = (Math.random() - 0.48) * (basePrice * 0.015)
+            const open = price
+            const close = open + change
+            const high = Math.max(open, close) + Math.random() * (basePrice * 0.008)
+            const low = Math.min(open, close) - Math.random() * (basePrice * 0.008)
+            price = close
+            candles.push({ time, open, high, low, close })
+            volumeData.push({
+              time,
+              value: Math.round(1000 + Math.random() * 5000),
+              color: close >= open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+            })
+          }
+          if (candleSeries && typeof candleSeries.setData === 'function') {
+            candleSeries.setData(candles)
+          }
+          if (volumeSeries && typeof volumeSeries.setData === 'function') {
+            volumeSeries.setData(volumeData)
+          }
+        })
 
       // Calculate EMA data helper
       const calculateEMA = (period) => {

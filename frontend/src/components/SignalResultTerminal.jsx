@@ -324,6 +324,7 @@ On-Chain Proof: ${txHash ? `https://explorer.ritualfoundation.org/tx/${txHash}` 
           <div style={{ marginBottom: 24 }}>
             <TradingViewLightweightChart
               symbol={signalReport.symbol || signalReport.pair?.replace('/', '') || 'BTCUSDT'}
+              timeframe={selectedTimeframe || '4h'}
               currentPrice={entryPrice}
               overlays={chartOverlays}
               tradeData={{ entry: entryPrice, takeProfit: tpPrice, stopLoss: slPrice }}
