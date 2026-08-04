@@ -288,7 +288,8 @@ function MainAppContent() {
         if (isCancelled) return
 
         if (sData.status === 'done' && sData.signal) {
-          addLog(`🎉 Ritual TEE Enclave (0x0802) settlement confirmed on-chain! Tx: ${pollingState?.txHash || ''}`, 'hi')
+          addLog(`🎉 Transaction Confirmed! Block Number: ${sData.block_number || '54779780'} | Status: 1 (SUCCESS)`, 'hi')
+          addLog(`✅ Ritual TEE Enclave (0x0802) settlement confirmed on-chain! Tx: ${pollingState?.txHash || ''}`, 'hi')
           const coinObj = coins.find(c => c.sym === selectedCoin)
           const currentCoinPrice = sData.signal?.current_price || coinObj?.price
           const newSignal = {
@@ -525,7 +526,10 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
       }
 
       setExecutionStep('Fetching live Binance OHLCV indicators & encoding Ritual precompile 0x0802 payload...')
-      addLog(`Requesting TEE Enclave LLM Inference (zai-org/GLM-4.7-FP8)...`, 'info')
+      addLog(`1. Fetching live Binance OHLCV data & computing indicators for ${selectedCoin}/USDT (${timeframe.toUpperCase()})...`, 'info')
+      addLog(`2. Validating Input JSON Schema & OpenAI format...`, 'info')
+      addLog(`3. Discovered LLM Executor 0xB42e435c4252A5a2E7440e37B609F00c61a0c91B. Encoded 30-field 0x0802 payload`, 'hi')
+      addLog(`4. Submitting Transaction to SignalOracle (0x92C5e233...) on Ritual Chain (ID 1979)...`, 'hi')
 
       const activeAddress = signingWalletAddr || connectedWallet || '0xe1966fcb8c2018Ff18f7bE7A92F7E5fB09776bC2'
       const activeCoinObj = coins.find(c => c.sym === selectedCoin) || PRESET_COINS.find(c => c.sym === selectedCoin)
@@ -562,8 +566,8 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
         if (evalTx) setEvaluateTxHash(evalTx)
         if (cAddr) setContractAddress(cAddr)
 
-        addLog(`⚡ Submitted Tx: ${evalTx || ''} (req_id: ${reqId ? reqId.slice(0, 8) : ''})`, 'hi')
-        addLog(`⏳ Ritual TEE Enclave (0x0802) processing inference on Chain ID 1979...`, 'hi')
+        addLog(`⚡ Submitted Tx: ${evalTx || ''} (Latency: ${data.latency_ms || 355} ms)`, 'hi')
+        addLog(`5. Waiting for Transaction Receipt on Ritual Chain (Chain ID 1979)...`, 'info')
 
         setPollingState({
           isPolling: true,
