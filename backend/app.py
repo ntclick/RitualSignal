@@ -276,6 +276,36 @@ async def get_coins(network: Optional[str] = "ritual_testnet"):
         ]
     return {"prices": results, "coins": results, "status": "ok"}
 
+
+@app.get("/api/klines")
+async def get_klines(symbol: str = "BTCUSDT", interval: str = "4h", limit: int = 60):
+    clean_sym = symbol.replace("/", "").replace("-", "").upper()
+    if not clean_sym.endswith("USDT") and not clean_sym.endswith("BUSD"):
+        clean_sym += "USDT"
+    valid_interval = {"15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d"}.get(interval.lower(), "4h")
+    url = f"https://api.binance.com/api/v3/klines?symbol={clean_sym}&interval={valid_interval}&limit={limit}"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as http_client:
+            r = await http_client.get(url)
+            if r.status_code == 200:
+                klines = r.json()
+                candles = [
+                    {
+                        "time": int(k[0] / 1000),
+                        "open": float(k[1]),
+                        "high": float(k[2]),
+                        "low": float(k[3]),
+                        "close": float(k[4]),
+                        "volume": float(k[5])
+                    }
+                    for k in klines
+                ]
+                return {"symbol": clean_sym, "interval": valid_interval, "candles": candles, "status": "ok"}
+    except Exception as e:
+        print(f"Klines fetch error: {e}")
+
+    return {"symbol": clean_sym, "interval": valid_interval, "candles": [], "status": "error"}
+
 @app.post("/api/signal/pay")
 def pay_for_signal(body: PayRequest):
     """Backend wallet micropayment fallback for user queries on SignalTreasury contract."""

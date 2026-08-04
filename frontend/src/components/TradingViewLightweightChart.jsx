@@ -104,32 +104,27 @@ export const TradingViewLightweightChart = ({
         return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       }
 
-      // Fetch real live Binance OHLCV candles for the exact symbol and timeframe
+      // Fetch real live Binance OHLCV candles via server-side API or direct fallback
       const cleanSym = (symbol || 'BTCUSDT').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
       const interval = (timeframe || '4h').toLowerCase()
-      const basePrice = Number(currentPrice) && Number(currentPrice) > 0 ? Number(currentPrice) : 1.0
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8001'
+      const klinesEndpoint = `${backendUrl}/api/klines?symbol=${cleanSym}&interval=${interval}&limit=60`
 
-      let candles = []
-      let volumeData = []
-
-      fetch(`https://api.binance.com/api/v3/klines?symbol=${cleanSym}&interval=${interval}&limit=60`)
-        .then(res => {
-          if (res.ok) return res.json()
-          throw new Error('Binance API fallback')
-        })
-        .then(klines => {
-          if (Array.isArray(klines) && klines.length > 0) {
-            candles = klines.map(k => ({
-              time: Math.floor(k[0] / 1000),
-              open: parseFloat(k[1]),
-              high: parseFloat(k[2]),
-              low: parseFloat(k[3]),
-              close: parseFloat(k[4])
+      fetch(klinesEndpoint)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.candles && Array.isArray(data.candles) && data.candles.length > 0) {
+            const candles = data.candles.map(c => ({
+              time: c.time,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close
             }))
-            volumeData = klines.map(k => ({
-              time: Math.floor(k[0] / 1000),
-              value: parseFloat(k[5]),
-              color: parseFloat(k[4]) >= parseFloat(k[1]) ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+            const volumeData = data.candles.map(c => ({
+              time: c.time,
+              value: c.volume,
+              color: c.close >= c.open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
             }))
             if (candleSeries && typeof candleSeries.setData === 'function') {
               candleSeries.setData(candles)
@@ -137,33 +132,36 @@ export const TradingViewLightweightChart = ({
             if (volumeSeries && typeof volumeSeries.setData === 'function') {
               volumeSeries.setData(volumeData)
             }
+          } else {
+            throw new Error('Fallback to direct Binance')
           }
         })
-        .catch(_ => {
-          // Synthetic fallback if offline
-          const nowSec = Math.floor(Date.now() / 1000)
-          let price = basePrice * 0.95
-          for (let i = 40; i >= 0; i--) {
-            const time = nowSec - i * 4 * 3600
-            const change = (Math.random() - 0.48) * (basePrice * 0.015)
-            const open = price
-            const close = open + change
-            const high = Math.max(open, close) + Math.random() * (basePrice * 0.008)
-            const low = Math.min(open, close) - Math.random() * (basePrice * 0.008)
-            price = close
-            candles.push({ time, open, high, low, close })
-            volumeData.push({
-              time,
-              value: Math.round(1000 + Math.random() * 5000),
-              color: close >= open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+        .catch(() => {
+          fetch(`https://api.binance.com/api/v3/klines?symbol=${cleanSym}&interval=${interval}&limit=60`)
+            .then(res => res.json())
+            .then(klines => {
+              if (Array.isArray(klines) && klines.length > 0) {
+                const candles = klines.map(k => ({
+                  time: Math.floor(k[0] / 1000),
+                  open: parseFloat(k[1]),
+                  high: parseFloat(k[2]),
+                  low: parseFloat(k[3]),
+                  close: parseFloat(k[4])
+                }))
+                const volumeData = klines.map(k => ({
+                  time: Math.floor(k[0] / 1000),
+                  value: parseFloat(k[5]),
+                  color: parseFloat(k[4]) >= parseFloat(k[1]) ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+                }))
+                if (candleSeries && typeof candleSeries.setData === 'function') {
+                  candleSeries.setData(candles)
+                }
+                if (volumeSeries && typeof volumeSeries.setData === 'function') {
+                  volumeSeries.setData(volumeData)
+                }
+              }
             })
-          }
-          if (candleSeries && typeof candleSeries.setData === 'function') {
-            candleSeries.setData(candles)
-          }
-          if (volumeSeries && typeof volumeSeries.setData === 'function') {
-            volumeSeries.setData(volumeData)
-          }
+            .catch(() => {})
         })
 
       // Calculate EMA data helper
