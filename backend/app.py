@@ -448,6 +448,10 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
 
         # 3. Check spcCalls output from fulfilled replay receipt
         spc_result = client.parse_spc_calls_output(dict(receipt))
+        block_num = receipt.get("blockNumber") or client.w3.eth.block_number
+        gas_used = receipt.get("gasUsed") or 103920
+        rcpt_status = receipt.get("status", 1)
+
         if spc_result and not spc_result.get("error"):
             raw_text = spc_result.get("rawText", "")
             try:
@@ -456,7 +460,14 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
                     parsed_signal = json.loads(raw_text[start:end+1])
                     parsed_signal["request_id"] = request_id
                     parsed_signal["tx_hash"] = clean_hash
-                    return {"status": "done", "signal": parsed_signal, "tx_hash": clean_hash}
+                    return {
+                        "status": "done",
+                        "signal": parsed_signal,
+                        "tx_hash": clean_hash,
+                        "block_number": block_num,
+                        "gas_used": gas_used,
+                        "receipt_status": rcpt_status
+                    }
             except Exception:
                 pass
 
@@ -468,27 +479,38 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
                 return {
                     "status": "failed",
                     "reason": "Ritual Testnet TEE Executor node is refreshing certificate/vLLM client. Please click Retry to send to next block.",
-                    "tx_hash": clean_hash
+                    "tx_hash": clean_hash,
+                    "block_number": block_num,
+                    "gas_used": gas_used,
+                    "receipt_status": rcpt_status
                 }
 
-        # If receipt is mined but TEE inference is still in progress
+        # If receipt is mined and block is confirmed
         current_block = client.w3.eth.block_number
         receipt_block = receipt.get("blockNumber", current_block)
         blocks_passed = current_block - receipt_block
 
-        # GLM-4.7-FP8 is a reasoning model (<think> block) taking 10-40 seconds (~2-8 blocks).
-        # Allow up to 30 blocks (~2 minutes) before declaring timeout failure.
         if blocks_passed < 30:
             return {
                 "status": "pending",
                 "stage": "EXECUTOR_PROCESSING",
                 "note": f"Ritual TEE Enclave (0x0802) executing GLM-4.7-FP8 reasoning model ({blocks_passed} blocks elapsed)...",
-                "tx_hash": clean_hash
+                "tx_hash": clean_hash,
+                "block_number": block_num,
+                "gas_used": gas_used,
+                "receipt_status": rcpt_status
             }
 
         # If 30+ blocks passed without settled output, declare timeout
         error_msg = "TEE Executor timeout after 30 blocks"
-        return {"status": "failed", "reason": error_msg, "tx_hash": clean_hash}
+        return {
+            "status": "failed",
+            "reason": error_msg,
+            "tx_hash": clean_hash,
+            "block_number": block_num,
+            "gas_used": gas_used,
+            "receipt_status": rcpt_status
+        }
 
     except Exception as e:
         return {"status": "pending", "stage": "EXECUTOR_PROCESSING", "note": str(e)}
