@@ -310,6 +310,12 @@ class RitualClient:
         if not self.account:
             raise ValueError("Ritual client initialized without private key")
 
+        # Auto-verify and extend deposit lock in RitualWallet before executing precompile 0x0802
+        try:
+            self.ensure_wallet_locked(1000000)
+        except Exception as lock_err:
+            print(f"[RITUAL WALLET LOCK WARNING] {lock_err}")
+
         oracle = self.w3.eth.contract(address=to_checksum_address(oracle_address), abi=oracle_abi)
         n1 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'latest')
         n2 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'pending')
