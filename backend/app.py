@@ -466,9 +466,21 @@ async def evaluate_signal(body: EvaluateRequest):
     except Exception as e:
         print(f"Binance fetch warning: {e}")
 
+    # Fallback to Binance Ticker 24hr if klines request was interrupted
+    if last_price <= 0.0:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as http_client:
+                r_price = await http_client.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}USDT")
+                if r_price.status_code == 200:
+                    last_price = float(r_price.json().get("lastPrice", 0.0))
+        except Exception:
+            pass
+
+    price_fmt = format_price_precision(last_price)
+
     market_summary = (
         f"Pair: {symbol}/USDT | Timeframe: {timeframe.upper()} | Strategy: {body.strategy}\n"
-        f"Current Price: ${last_price:,.6g} | RSI(14): {rsi_14:.1f} ({rsi_zone})\n"
+        f"Current Price: {price_fmt} | RSI(14): {rsi_14:.1f} ({rsi_zone})\n"
         f"EMA Trend: {ema_trend} | RVOL: {rvol:.2f}x | Taker Buy Ratio: {last_buy_ratio:.1f}%\n"
         f"ATR(14): ${atr_14:,.6g} ({atr_pct:.2f}% of price)"
     )
