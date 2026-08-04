@@ -642,15 +642,42 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
         except (TransactionNotFound, Exception):
             receipt = None
 
-        block_num = receipt.get("blockNumber") if receipt else client.w3.eth.block_number
-        gas_used = receipt.get("gasUsed") if receipt else 103920
-        rcpt_status = receipt.get("status", 1) if receipt else 1
+        if not receipt:
+            return {
+                "status": "pending",
+                "tx_hash": clean_hash,
+                "message": "Transaction pending inclusion on Ritual Chain..."
+            }
 
-        # 3. Check spcCalls output if receipt is available
-        if receipt:
-            spc_result = client.parse_spc_calls_output(dict(receipt))
-            if spc_result and not spc_result.get("error"):
-                raw_text = spc_result.get("rawText", "")
+        block_num = receipt.get("blockNumber")
+        gas_used = receipt.get("gasUsed", 0)
+        rcpt_status = receipt.get("status", 1)
+
+        if rcpt_status == 0:
+            return {
+                "status": "error",
+                "error": "Ritual Chain Transaction Reverted (Status 0)",
+                "tx_hash": clean_hash,
+                "block_number": block_num,
+                "gas_used": gas_used
+            }
+
+        # 3. Check spcCalls TEE output from transaction receipt
+        spc_result = client.parse_spc_calls_output(dict(receipt))
+        if spc_result:
+            if spc_result.get("error"):
+                err_msg = spc_result.get("errorMessage", "TEE Executor Node returned on-chain execution error")
+                return {
+                    "status": "error",
+                    "error": f"Ritual TEE Enclave Error: {err_msg}",
+                    "tx_hash": clean_hash,
+                    "block_number": block_num,
+                    "gas_used": gas_used,
+                    "receipt_status": rcpt_status
+                }
+
+            raw_text = spc_result.get("rawText", "")
+            if raw_text:
                 try:
                     start, end = raw_text.find("{"), raw_text.rfind("}")
                     if start != -1 and end != -1:
@@ -666,48 +693,37 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
                             "receipt_status": rcpt_status
                         }
                 except Exception:
-                    pass
+                    return {
+                        "status": "done",
+                        "signal": {
+                            "verdict": "Neutral",
+                            "confidence": 75,
+                            "expert_summary": raw_text,
+                            "supporting": [raw_text],
+                            "counterpoint": "TEE output format in raw text.",
+                            "invalidation": "Verify raw TEE attestation.",
+                            "trade": {"entry": "$0", "takeProfit": "$0", "stopLoss": "$0", "riskReward": 1.0},
+                            "source_type": "Ritual TEE Enclave (Raw Response)"
+                        },
+                        "tx_hash": clean_hash,
+                        "block_number": block_num,
+                        "gas_used": gas_used
+                    }
 
-        # 4. Universal Fallback: Always return status: done with Quant Signal report card
-        cached = EVALUATION_CACHE.get(clean_hash) or EVALUATION_CACHE.get(request_id) or {}
-        fallback_signal = build_quant_rubric_signal(
-            symbol=cached.get("symbol", "BTC"),
-            pair=cached.get("pair", "BTC/USDT"),
-            timeframe=cached.get("timeframe", "4h"),
-            strategy=cached.get("strategy", "RSI + EMA Stack"),
-            last_price=cached.get("last_price", 63699.47),
-            rsi_14=cached.get("rsi_14", 58.4),
-            ema_trend=cached.get("ema_trend", "Bullish stack (price > EMA9 > EMA20 > EMA50)"),
-            rvol=cached.get("rvol", 1.45),
-            atr_14=cached.get("atr_14", 1240.50),
-            execution_model=cached.get("execution_model", "0x0802")
-        )
-        fallback_signal["request_id"] = request_id
-        fallback_signal["tx_hash"] = clean_hash
-
+        # 4. If transaction committed on-chain (Status 1) but TEE async settlement result is pending
         return {
-            "status": "done",
-            "signal": fallback_signal,
+            "status": "pending",
             "tx_hash": clean_hash,
             "block_number": block_num,
             "gas_used": gas_used,
-            "receipt_status": rcpt_status
+            "message": f"Transaction committed on-chain (Block {block_num}). Awaiting Ritual TEE Executor Node async settlement..."
         }
 
     except Exception as e:
-        print(f"[STATUS EXCEPTION HANDLED] {e}")
-        fallback_signal = build_quant_rubric_signal(
-            symbol="BTC", pair="BTC/USDT", timeframe="4h", strategy="RSI + EMA Stack",
-            last_price=63699.47, rsi_14=58.4, ema_trend="Bullish stack (price > EMA9 > EMA20 > EMA50)",
-            rvol=1.45, atr_14=1240.50
-        )
         return {
-            "status": "done",
-            "signal": fallback_signal,
-            "tx_hash": clean_hash,
-            "block_number": 54789217,
-            "gas_used": 103920,
-            "receipt_status": 1
+            "status": "error",
+            "error": f"Failed to poll Ritual TEE status on-chain: {e}",
+            "tx_hash": clean_hash
         }
 
 
