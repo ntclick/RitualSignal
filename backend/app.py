@@ -55,6 +55,8 @@ def load_abi(filename: str) -> list:
 ORACLE_ABI   = load_abi("SignalOracle.json")
 TREASURY_ABI = load_abi("SignalTreasury.json")
 
+EVALUATION_CACHE = {}
+
 def _ema(data: list, period: int) -> float:
     """Exponential Moving Average helper used for EMA9/20/50 computation from OHLCV closes."""
     k = 2.0 / (period + 1)
@@ -402,6 +404,23 @@ async def evaluate_signal(body: EvaluateRequest):
         )
 
         clean_tx_hash = eval_tx_hash if eval_tx_hash.startswith("0x") else "0x" + eval_tx_hash
+
+        # Cache parameters for dynamic fallback
+        cache_entry = {
+            "symbol": symbol,
+            "pair": f"{symbol}/USDT",
+            "timeframe": timeframe,
+            "strategy": body.strategy,
+            "last_price": last_price,
+            "rsi_14": rsi_14,
+            "ema_trend": ema_trend,
+            "rvol": rvol,
+            "atr_14": atr_14
+        }
+        EVALUATION_CACHE[clean_tx_hash] = cache_entry
+        if request_id:
+            EVALUATION_CACHE[request_id] = cache_entry
+
         return {
             "status": "pending",
             "eval_tx_hash": clean_tx_hash,
@@ -517,17 +536,17 @@ def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", reques
 
         # 4. Fallback: If receipt is confirmed on Ritual Chain (status == 1), return status: done with Quant Signal
         if rcpt_status == 1:
-            # Generate clean fallback signal report card
+            cached = EVALUATION_CACHE.get(clean_hash) or EVALUATION_CACHE.get(request_id) or {}
             fallback_signal = build_quant_rubric_signal(
-                symbol="BTC",
-                pair="BTC/USDT",
-                timeframe="4h",
-                strategy="RSI + EMA Stack",
-                last_price=63699.47,
-                rsi_14=58.4,
-                ema_trend="Bullish stack (price > EMA9 > EMA20 > EMA50)",
-                rvol=1.45,
-                atr_14=1240.50
+                symbol=cached.get("symbol", "BTC"),
+                pair=cached.get("pair", "BTC/USDT"),
+                timeframe=cached.get("timeframe", "4h"),
+                strategy=cached.get("strategy", "RSI + EMA Stack"),
+                last_price=cached.get("last_price", 63699.47),
+                rsi_14=cached.get("rsi_14", 58.4),
+                ema_trend=cached.get("ema_trend", "Bullish stack (price > EMA9 > EMA20 > EMA50)"),
+                rvol=cached.get("rvol", 1.45),
+                atr_14=cached.get("atr_14", 1240.50)
             )
             fallback_signal["request_id"] = request_id
             fallback_signal["tx_hash"] = clean_hash
