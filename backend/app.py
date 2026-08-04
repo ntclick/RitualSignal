@@ -548,13 +548,13 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
     if rsi_14 >= 55 and "Bullish" in str(ema_trend):
         verdict = "Long"
         confidence = min(92, max(65, int(55 + (rsi_14 - 50) * 1.5 + (rvol - 1.0) * 10)))
-        tp_mult = 1.035
-        sl_mult = 0.982
+        tp_mult = 1.038
+        sl_mult = 0.981
     elif rsi_14 <= 45 and "Bearish" in str(ema_trend):
         verdict = "Short"
         confidence = min(92, max(65, int(55 + (50 - rsi_14) * 1.5 + (rvol - 1.0) * 10)))
-        tp_mult = 0.965
-        sl_mult = 1.018
+        tp_mult = 0.962
+        sl_mult = 1.019
     else:
         verdict = "Neutral"
         confidence = 68
@@ -578,24 +578,40 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
     }
     source_type = model_names.get(execution_model, "Ritual LLM Precompile (0x0802 TEE Enclave)")
 
+    rsi_state = "Overbought expansion" if rsi_14 >= 70 else ("Bullish momentum" if rsi_14 >= 55 else ("Oversold exhaustion" if rsi_14 <= 30 else ("Bearish pressure" if rsi_14 <= 45 else "Neutral consolidation")))
+    vol_state = f"High institutional participation ({rvol:.2f}x average volume)" if rvol > 1.2 else f"Subdued volume environment ({rvol:.2f}x relative volume)"
+
+    expert_summary = (
+        f"Quantitative Risk Analysis for {symbol} ({timeframe.upper()}) via {source_type}:\n"
+        f"Asset is trading at {entry_str} with {verdict.upper()} structure (Confidence: {confidence}%). "
+        f"RSI(14) stands at {rsi_14:.1f} ({rsi_state}), while trend structure shows {ema_trend}. "
+        f"Volume analysis indicates {vol_state}."
+    )
+
+    supporting_drivers = [
+        f"RSI(14) momentum at {rsi_14:.1f} signals {rsi_state.lower()} in line with {verdict.lower()} directional bias.",
+        f"EMA Trend Structure: {ema_trend} with {rvol:.2f}x volume relative expansion factor.",
+        f"ATR(14) Volatility metric at ${atr_14:,.6g} yields optimal target sizing with R:R ratio of {rr}."
+    ]
+
+    counterpoint = f"Macro volatility and sudden liquidity shifts could challenge the setup. ATR(14) at ${atr_14:,.6g} requires strict invalidation management."
+    invalidation = f"A candle close beyond {sl_str} invalidates the quantitative thesis and triggers immediate risk mitigation."
+
     return {
         "verdict": verdict,
         "confidence": confidence,
         "current_price": last_price,
-        "expert_summary": f"Quant Rubric analysis for {symbol} ({timeframe.upper()}) via {source_type} shows {verdict.upper()} structure with RSI(14) at {rsi_14:.1f} and {ema_trend}.",
-        "supporting": [
-            f"RSI(14) momentum at {rsi_14:.1f} aligns with {verdict.lower()} directional bias.",
-            f"EMA Trend structure: {ema_trend} with {rvol:.2f}x volume relative factor."
-        ],
-        "counterpoint": f"ATR(14) volatility at ${atr_14:,.6g} requires strict stop loss placement at {sl_str}.",
-        "invalidation": f"Price close below {sl_str} invalidates quantitative setup.",
+        "expert_summary": expert_summary,
+        "supporting": supporting_drivers,
+        "counterpoint": counterpoint,
+        "invalidation": invalidation,
         "trade": {
             "entry": entry_str,
             "takeProfit": tp_str,
             "stopLoss": sl_str,
             "riskReward": rr
         },
-        "source": "Binance OHLCV Klines",
+        "source": "Binance OHLCV Live Klines",
         "source_type": source_type
     }
 
