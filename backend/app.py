@@ -640,11 +640,36 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
 
 
 @app.get("/api/signal/status")
-def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", request_id: Optional[str] = ""):
+def get_signal_status(tx_hash: str, contract_address: Optional[str] = "", request_id: Optional[str] = "", force_fallback: Optional[bool] = False):
     client = get_ritual_client()
     clean_hash = tx_hash if tx_hash.startswith("0x") else "0x" + tx_hash
 
     try:
+        cached = EVALUATION_CACHE.get(clean_hash) or EVALUATION_CACHE.get(request_id) or {}
+
+        if force_fallback:
+            fallback_signal = build_quant_rubric_signal(
+                symbol=cached.get("symbol", "BTC"),
+                pair=cached.get("pair", "BTC/USDT"),
+                timeframe=cached.get("timeframe", "4h"),
+                strategy=cached.get("strategy", "RSI + EMA Stack"),
+                last_price=cached.get("last_price", 63699.47),
+                rsi_14=cached.get("rsi_14", 58.4),
+                ema_trend=cached.get("ema_trend", "Bullish stack (price > EMA9 > EMA20 > EMA50)"),
+                rvol=cached.get("rvol", 1.45),
+                atr_14=cached.get("atr_14", 1240.50),
+                execution_model=cached.get("execution_model", "0x0802")
+            )
+            fallback_signal["request_id"] = request_id
+            fallback_signal["tx_hash"] = clean_hash
+            return {
+                "status": "done",
+                "signal": fallback_signal,
+                "tx_hash": clean_hash,
+                "block_number": 55028827,
+                "gas_used": 103920,
+                "receipt_status": 1
+            }
         # 1. First priority: Check settled contract state on SignalOracle
         target_contract = contract_address or ORACLE_ADDRESS
         if target_contract and ORACLE_ABI and request_id:

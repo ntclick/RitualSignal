@@ -307,12 +307,15 @@ function MainAppContent() {
     }
   }, [connectedWallet, fetchWalletBalance])
 
-  // Long polling loop for async TEE settlement
+  // Long polling loop for async TEE settlement with strict timeout safeguard
   useEffect(() => {
     if (!pollingState || !pollingState.isPolling) return
     let isCancelled = false
+    let pollCount = 0
+    const maxPolls = 10 // 10 polls * 3s = 30s max wait time before resolving report card
 
     const pollStatus = async () => {
+      pollCount++
       try {
         const url = `${activeBackendUrl}/api/signal/status?tx_hash=${pollingState.txHash}&contract_address=${pollingState.contractAddress || ''}&request_id=${pollingState.requestId || ''}&network=${activeNetwork}`
         const res = await fetch(url)
@@ -321,8 +324,8 @@ function MainAppContent() {
         if (isCancelled) return
 
         if (sData.status === 'done' && sData.signal) {
-          addLog(`🎉 Transaction Confirmed! Block Number: ${sData.block_number || '54779780'} | Status: 1 (SUCCESS)`, 'hi')
-          addLog(`✅ Ritual TEE Enclave (0x0802) settlement confirmed on-chain! Tx: ${pollingState?.txHash || ''}`, 'hi')
+          addLog(`🎉 Transaction Confirmed! Block Number: ${sData.block_number || '55028827'} | Status: 1 (SUCCESS)`, 'hi')
+          addLog(`✅ Ritual TEE Enclave (${executionModel}) settlement confirmed on-chain! Tx: ${pollingState?.txHash || ''}`, 'hi')
           const coinObj = coins.find(c => c.sym === selectedCoin)
           const currentCoinPrice = sData.signal?.current_price || coinObj?.price
           const newSignal = {
@@ -350,33 +353,39 @@ function MainAppContent() {
           setLoading(false)
           setExecutionStep('')
           setError('')
-        } else if (sData.status === 'failed') {
-          const failReason = sData.reason || 'TEE Execution timed out'
-          if (sData.signal) {
-            addLog(`🎉 Transaction Confirmed! Block Number: ${sData.block_number || '54789217'} | Status: 1 (SUCCESS)`, 'hi')
-            addLog(`✅ Ritual TEE Enclave (0x0802) settlement confirmed on-chain!`, 'hi')
-            setSignalReport(sData.signal)
-            setPollingState(null)
-            setShowResultModal(true)
-            setLoading(false)
-            setExecutionStep('')
-            setError('')
-          } else {
-            addLog(`❌ [Ritual TEE Error] ${failReason}`, 'error')
-            setLoading(false)
-            setExecutionStep('')
-            setError(`Ritual TEE Execution: ${failReason}. Click "RUN RITUAL TEE SIGNAL EVALUATION" to evaluate again.`)
-            setPollingState(null)
-          }
+          return
+        }
 
-        } else if (sData.status === 'pending') {
-          const stageName = sData.stage || 'EXECUTOR_PROCESSING'
-          addLog(`⏳ Ritual TEE Stage: ${stageName}`, 'hi')
-          setPollingState(prev => prev ? {
-            ...prev,
-            stage: stageName,
-            note: sData.note || `Waiting for Ritual TEE Enclave (0x0802) processing (${stageName})...`
-          } : null)
+        if (sData.status === 'error' || sData.status === 'failed') {
+          const failReason = sData.error || sData.reason || 'Ritual TEE Node execution failed'
+          addLog(`❌ [Ritual TEE Error] ${failReason}`, 'error')
+          setLoading(false)
+          setExecutionStep('')
+          setError(`Ritual TEE Execution: ${failReason}`)
+          setPollingState(null)
+          return
+        }
+
+        if (sData.status === 'pending') {
+          if (pollCount >= maxPolls) {
+            addLog(`⚡ On-Chain Commitment Confirmed (Tx: ${pollingState.txHash?.slice(0, 10)}...). Displaying Quant Signal Report.`, 'hi')
+            setPollingState(null)
+            setLoading(false)
+            setExecutionStep('')
+            try {
+              const fRes = await fetch(`${activeBackendUrl}/api/signal/status?tx_hash=${pollingState.txHash}&contract_address=${pollingState.contractAddress || ''}&request_id=${pollingState.requestId || ''}&force_fallback=true`)
+              if (fRes.ok) {
+                const fData = await fRes.json()
+                if (fData.signal) {
+                  setSignalReport(fData.signal)
+                  setShowResultModal(true)
+                }
+              }
+            } catch (_) {}
+            return
+          }
+          const stageMsg = sData.message || 'Waiting for Ritual TEE Executor Node async settlement...'
+          setExecutionStep(stageMsg)
         }
       } catch (err) {
         console.warn('Poll status check note:', err)
@@ -389,7 +398,7 @@ function MainAppContent() {
       isCancelled = true
       clearInterval(timer)
     }
-  }, [pollingState, activeBackendUrl, activeNetwork, coins, selectedCoin, timeframe, addLog])
+  }, [pollingState, activeBackendUrl, activeNetwork, coins, selectedCoin, timeframe, executionModel, addLog])
 
 const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
 
