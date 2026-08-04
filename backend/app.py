@@ -532,16 +532,16 @@ async def evaluate_signal(body: EvaluateRequest):
     }
 
 
-def format_price_precision_num(val: float) -> float:
+def format_price_precision(val: float) -> str:
     if val <= 0:
-        return 0.0
+        return "$0.00"
     if val < 0.0001:
-        return round(val, 8)
+        return f"${val:.8f}"
     if val < 0.01:
-        return round(val, 6)
+        return f"${val:.6f}"
     if val < 1.0:
-        return round(val, 4)
-    return round(val, 2)
+        return f"${val:.4f}"
+    return f"${val:,.2f}"
 
 
 def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: str, last_price: float, rsi_14: float, ema_trend: str, rvol: float, atr_14: float, execution_model: str = "0x0802"):
@@ -561,10 +561,14 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
         tp_mult = 1.02
         sl_mult = 0.99
 
-    entry = format_price_precision_num(last_price)
-    tp = format_price_precision_num(last_price * tp_mult)
-    sl = format_price_precision_num(last_price * sl_mult)
-    rr = round(abs(tp - entry) / (abs(entry - sl) or 0.000001), 2)
+    entry_str = format_price_precision(last_price)
+    tp_str = format_price_precision(last_price * tp_mult)
+    sl_str = format_price_precision(last_price * sl_mult)
+
+    entry_num = float(entry_str.replace("$", "").replace(",", ""))
+    tp_num = float(tp_str.replace("$", "").replace(",", ""))
+    sl_num = float(sl_str.replace("$", "").replace(",", ""))
+    rr = round(abs(tp_num - entry_num) / (abs(entry_num - sl_num) or 0.000001), 2)
 
     model_names = {
         "0x0802": "Ritual LLM Precompile (0x0802 Short-Running TEE)",
@@ -583,12 +587,12 @@ def build_quant_rubric_signal(symbol: str, pair: str, timeframe: str, strategy: 
             f"RSI(14) momentum at {rsi_14:.1f} aligns with {verdict.lower()} directional bias.",
             f"EMA Trend structure: {ema_trend} with {rvol:.2f}x volume relative factor."
         ],
-        "counterpoint": f"ATR(14) volatility at ${atr_14:,.6g} requires strict stop loss placement at ${sl}.",
-        "invalidation": f"Price close below ${sl} invalidates quantitative setup.",
+        "counterpoint": f"ATR(14) volatility at ${atr_14:,.6g} requires strict stop loss placement at {sl_str}.",
+        "invalidation": f"Price close below {sl_str} invalidates quantitative setup.",
         "trade": {
-            "entry": entry,
-            "takeProfit": tp,
-            "stopLoss": sl,
+            "entry": entry_str,
+            "takeProfit": tp_str,
+            "stopLoss": sl_str,
             "riskReward": rr
         },
         "source": "Binance OHLCV Klines",
