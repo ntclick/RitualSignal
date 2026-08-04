@@ -63,10 +63,10 @@ export const SignalResultTerminal = ({
   }
 
   const formatUsd = (val) => {
-    if (val === undefined || val === null || isNaN(val)) return '$0.00'
+    if (val === undefined || val === null || isNaN(val) || val <= 0) return '$0.00'
     const num = Number(val)
-    if (num < 0.00001) return `$${num.toFixed(8)}`
-    if (num < 0.001) return `$${num.toFixed(6)}`
+    if (num < 0.0001) return `$${num.toFixed(8)}`
+    if (num < 0.01) return `$${num.toFixed(6)}`
     if (num < 1) return `$${num.toFixed(4)}`
     return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }

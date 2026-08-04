@@ -247,27 +247,64 @@ def get_x402_quote(strategy: Optional[str] = None):
 @app.get("/api/coins")
 @app.get("/api/prices")
 async def get_coins(network: Optional[str] = "ritual_testnet"):
-    cg_ids = ",".join([c["cg_id"] for c in COINS_MAP])
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_ids}&vs_currencies=usd&include_24hr_change=true"
     results = []
     try:
-        async with httpx.AsyncClient(timeout=8.0) as http_client:
+        url = "https://api.binance.com/api/v3/ticker/24hr"
+        async with httpx.AsyncClient(timeout=6.0) as http_client:
             r = await http_client.get(url)
             if r.status_code == 200:
-                cg_data = r.json()
+                binance_data = {x["symbol"]: x for x in r.json()}
                 for c in COINS_MAP:
-                    data = cg_data.get(c["cg_id"], {})
-                    price = float(data.get("usd", 0.0))
-                    change = float(data.get("usd_24h_change", 0.0))
+                    bin_sym = f"{c['sym']}USDT"
+                    item = binance_data.get(bin_sym, {})
+                    if item:
+                        price = float(item.get("lastPrice", 0.0))
+                        change = float(item.get("priceChangePercent", 0.0))
+                    else:
+                        price = 0.0
+                        change = 0.0
+
+                    if price < 0.0001:
+                        price_str = f"${price:.8f}"
+                    elif price < 0.01:
+                        price_str = f"${price:.6f}"
+                    elif price < 1.0:
+                        price_str = f"${price:.4f}"
+                    else:
+                        price_str = f"${price:,.2f}"
+                    change_str = f"{'+' if change >= 0 else ''}{change:.2f}%"
                     results.append({
                         "sym": c["sym"],
                         "pair": c["pair"],
                         "name": c["name"],
-                        "price": f"${price:,.4f}" if price < 1 else f"${price:,.2f}",
-                        "change": f"{'+' if change >= 0 else ''}{change:.2f}%"
+                        "price": price_str,
+                        "change": change_str
                     })
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[BINANCE PRICES FETCH ERROR] {e}")
+
+    if not results:
+        # Fallback to CoinGecko if Binance fails
+        cg_ids = ",".join([c["cg_id"] for c in COINS_MAP])
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_ids}&vs_currencies=usd&include_24hr_change=true"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as http_client:
+                r = await http_client.get(url)
+                if r.status_code == 200:
+                    cg_data = r.json()
+                    for c in COINS_MAP:
+                        data = cg_data.get(c["cg_id"], {})
+                        price = float(data.get("usd", 0.0))
+                        change = float(data.get("usd_24h_change", 0.0))
+                        results.append({
+                            "sym": c["sym"],
+                            "pair": c["pair"],
+                            "name": c["name"],
+                            "price": f"${price:,.4f}" if price < 1 else f"${price:,.2f}",
+                            "change": f"{'+' if change >= 0 else ''}{change:.2f}%"
+                        })
+        except Exception:
+            pass
 
     if not results:
         results = [
