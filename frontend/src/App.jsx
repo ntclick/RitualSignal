@@ -259,7 +259,8 @@ function MainAppContent() {
             if (item) {
               const price = parseFloat(item.lastPrice || 0)
               const change = parseFloat(item.priceChangePercent || 0)
-              const priceStr = price < 0.0001 ? `$${price.toFixed(8)}` :
+              const priceStr = price < 0.00001 ? `$${price.toFixed(10)}` :
+                               price < 0.0001 ? `$${price.toFixed(8)}` :
                                price < 0.01 ? `$${price.toFixed(6)}` :
                                price < 1.0 ? `$${price.toFixed(4)}` :
                                `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

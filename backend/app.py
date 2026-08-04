@@ -265,7 +265,9 @@ async def get_coins(network: Optional[str] = "ritual_testnet"):
                         price = 0.0
                         change = 0.0
 
-                    if price < 0.0001:
+                    if price < 0.00001:
+                        price_str = f"${price:.10f}"
+                    elif price < 0.0001:
                         price_str = f"${price:.8f}"
                     elif price < 0.01:
                         price_str = f"${price:.6f}"
@@ -558,6 +560,8 @@ async def evaluate_signal(body: EvaluateRequest):
 def format_price_precision(val: float) -> str:
     if val <= 0:
         return "$0.00"
+    if val < 0.00001:
+        return f"${val:.10f}"
     if val < 0.0001:
         return f"${val:.8f}"
     if val < 0.01:
