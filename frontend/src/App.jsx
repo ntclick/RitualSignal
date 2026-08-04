@@ -232,19 +232,51 @@ function MainAppContent() {
 
   const fetchLivePrices = useCallback(async () => {
     setPriceRefreshing(true)
+    let fetchedPrices = null
     try {
       const res = await fetch(`${activeBackendUrl}/api/prices?network=${activeNetwork}`)
       if (res.ok) {
         const data = await res.json()
         if (data.prices && Array.isArray(data.prices) && data.prices.length > 0) {
-          setCoins(data.prices)
-          addLog(`Updated live prices for ${data.prices.length} assets from Binance engine`, 'hi')
+          const hasStaticFallback = data.prices.some(p => p.price === '$1.00')
+          if (!hasStaticFallback) {
+            fetchedPrices = data.prices
+          }
         }
       }
-    } catch (_) {
-    } finally {
-      setPriceRefreshing(false)
+    } catch (_) {}
+
+    if (!fetchedPrices) {
+      try {
+        const binRes = await fetch('https://api.binance.com/api/v3/ticker/24hr')
+        if (binRes.ok) {
+          const rawBinance = await binRes.json()
+          const binMap = {}
+          rawBinance.forEach(item => { binMap[item.symbol] = item })
+
+          fetchedPrices = PRESET_COINS.map(c => {
+            const item = binMap[`${c.sym}USDT`]
+            if (item) {
+              const price = parseFloat(item.lastPrice || 0)
+              const change = parseFloat(item.priceChangePercent || 0)
+              const priceStr = price < 0.0001 ? `$${price.toFixed(8)}` :
+                               price < 0.01 ? `$${price.toFixed(6)}` :
+                               price < 1.0 ? `$${price.toFixed(4)}` :
+                               `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              const changeStr = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`
+              return { ...c, price: priceStr, change: changeStr }
+            }
+            return c
+          })
+        }
+      } catch (_) {}
     }
+
+    if (fetchedPrices && fetchedPrices.length > 0) {
+      setCoins(fetchedPrices)
+      addLog(`Updated live prices for ${fetchedPrices.length} assets from Binance ticker engine`, 'hi')
+    }
+    setPriceRefreshing(false)
   }, [activeBackendUrl, activeNetwork, addLog])
 
   const fetchRecentSignals = useCallback(async () => {
