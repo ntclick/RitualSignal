@@ -23,7 +23,10 @@ from web3 import Web3
 from eth_account import Account
 from eth_utils import to_checksum_address
 
-from ritual_client import RitualClient
+try:
+    from backend.ritual_client import RitualClient
+except ImportError:
+    from ritual_client import RitualClient
 
 load_dotenv(dotenv_path=pathlib.Path(__file__).parent.parent / ".env")
 
