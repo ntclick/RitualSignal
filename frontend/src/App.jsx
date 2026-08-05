@@ -118,11 +118,14 @@ const PRESET_COINS = [
   { sym: 'ETH', pair: 'ETH/USDT', name: 'Ethereum', price: '$1,885.50', change: '-1.20%' },
   { sym: 'SOL', pair: 'SOL/USDT', name: 'Solana', price: '$138.40', change: '+2.10%' },
   { sym: 'BNB', pair: 'BNB/USDT', name: 'BNB', price: '$575.20', change: '+0.45%' },
-  { sym: 'PEPE', pair: 'PEPE/USDT', name: 'Pepe', price: '$0.00000850', change: '-3.51%' },
-  { sym: 'DOGE', pair: 'DOGE/USDT', name: 'Dogecoin', price: '$0.0980', change: '-1.15%' },
-  { sym: 'SHIB', pair: 'SHIB/USDT', name: 'Shiba Inu', price: '$0.00001740', change: '+0.27%' },
-  { sym: 'WIF', pair: 'WIF/USDT', name: 'dogwifhat', price: '$1.4500', change: '-2.10%' },
-  { sym: 'AVAX', pair: 'AVAX/USDT', name: 'Avalanche', price: '$22.50', change: '+1.05%' },
+  { sym: 'PEPE', pair: 'PEPE/USDT', name: 'Pepe', price: '$0.00000286', change: '-2.72%' },
+  { sym: 'DOGE', pair: 'DOGE/USDT', name: 'Dogecoin', price: '$0.0697', change: '-0.70%' },
+  { sym: 'SHIB', pair: 'SHIB/USDT', name: 'Shiba Inu', price: '$0.00000492', change: '-1.85%' },
+  { sym: 'WIF', pair: 'WIF/USDT', name: 'dogwifhat', price: '$0.1412', change: '-0.07%' },
+  { sym: 'BONK', pair: 'BONK/USDT', name: 'Bonk', price: '$0.00000282', change: '-1.05%' },
+  { sym: 'FLOKI', pair: 'FLOKI/USDT', name: 'Floki', price: '$0.00002063', change: '+0.05%' },
+  { sym: 'NEIRO', pair: 'NEIRO/USDT', name: 'Neiro', price: '$0.00006206', change: '-0.43%' },
+  { sym: 'AVAX', pair: 'AVAX/USDT', name: 'Avalanche', price: '$6.64', change: '-3.02%' },
   { sym: 'LINK', pair: 'LINK/USDT', name: 'Chainlink', price: '$10.80', change: '-0.50%' },
   { sym: 'SUI', pair: 'SUI/USDT', name: 'Sui Network', price: '$0.9200', change: '-1.21%' },
   { sym: 'RENDER', pair: 'RENDER/USDT', name: 'Render Network', price: '$4.5000', change: '-3.00%' }
@@ -166,17 +169,16 @@ function MainAppContent() {
     return localStorage.getItem(LOCAL_STORAGE_WALLET_KEY) || null
   })
   const [walletBalance, setWalletBalance] = useState(null)
+  const [pollingState, setPollingState] = useState(null)
+  const [history, setHistory] = useState([])
 
   const [logs, setLogs] = useState([])
-  const [history, setHistory] = useState([])
   const [isLocalQuant, setIsLocalQuant] = useState(false)
-  const [pollingState, setPollingState] = useState(null)
 
   const activeNetObj = NETWORKS.find(n => n.id === activeNetwork) || NETWORKS[0]
 
   const addLog = useCallback((msg, type = 'info') => {
-    const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
-    setLogs(prev => [{ time: timeStr, msg, type }, ...prev.slice(0, 49)])
+    console.log(`[RITUAL DISPATCH Log] (${type}): ${msg}`)
   }, [])
 
   const renderLogMessageWithLinks = (msg) => {
@@ -219,15 +221,11 @@ function MainAppContent() {
   }
 
   const fetchWalletBalance = useCallback(async (addr) => {
-    if (!addr) {
-      setWalletBalance(null)
-      return
-    }
     try {
       const res = await fetch(`${activeBackendUrl}/api/wallet/balance/${addr}?network=${activeNetwork}`)
       if (res.ok) {
-        const data = await res.json()
-        setWalletBalance(data.balance_formatted)
+        const b = await res.json()
+        setWalletBalance(b.balance_ritual)
       }
     } catch (_) {}
   }, [activeBackendUrl, activeNetwork])
@@ -261,7 +259,8 @@ function MainAppContent() {
             if (item) {
               const price = parseFloat(item.lastPrice || 0)
               const change = parseFloat(item.priceChangePercent || 0)
-              const priceStr = price < 0.00001 ? `$${price.toFixed(10)}` :
+              const priceStr = price <= 0 ? (c.price || '$1.00') :
+                               price < 0.00001 ? `$${price.toFixed(8)}` :
                                price < 0.0001 ? `$${price.toFixed(8)}` :
                                price < 0.01 ? `$${price.toFixed(6)}` :
                                price < 1.0 ? `$${price.toFixed(4)}` :

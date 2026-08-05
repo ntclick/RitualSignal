@@ -261,21 +261,25 @@ async def get_coins(network: Optional[str] = "ritual_testnet"):
                     if item:
                         price = float(item.get("lastPrice", 0.0))
                         change = float(item.get("priceChangePercent", 0.0))
+                    if price <= 0.0:
+                        fallback_pair = DEFAULT_FALLBACKS.get(c["sym"], ("$1.00", "+0.00%"))
+                        price_str = fallback_pair[0]
+                        change_str = fallback_pair[1]
                     else:
-                        price = 0.0
-                        change = 0.0
+                        if price < 0.00001:
+                            price_str = f"${price:.10f}".rstrip('0')
+                            if price_str.endswith('.'):
+                                price_str += '00'
+                        elif price < 0.0001:
+                            price_str = f"${price:.8f}".rstrip('0')
+                        elif price < 0.01:
+                            price_str = f"${price:.6f}".rstrip('0')
+                        elif price < 1.0:
+                            price_str = f"${price:.4f}".rstrip('0')
+                        else:
+                            price_str = f"${price:,.2f}"
+                        change_str = f"{'+' if change >= 0 else ''}{change:.2f}%"
 
-                    if price < 0.00001:
-                        price_str = f"${price:.10f}"
-                    elif price < 0.0001:
-                        price_str = f"${price:.8f}"
-                    elif price < 0.01:
-                        price_str = f"${price:.6f}"
-                    elif price < 1.0:
-                        price_str = f"${price:.4f}"
-                    else:
-                        price_str = f"${price:,.2f}"
-                    change_str = f"{'+' if change >= 0 else ''}{change:.2f}%"
                     results.append({
                         "sym": c["sym"],
                         "pair": c["pair"],
