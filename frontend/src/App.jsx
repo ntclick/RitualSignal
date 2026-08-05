@@ -854,38 +854,27 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
                 </div>
               </div>
 
-              {/* Execution Model Selector */}
+              {/* Execution Model Display */}
               <div className="mt-6 pt-4 border-t border-white/[0.08]">
                 <label className="text-xs font-mono text-slate-400 mb-2 block uppercase tracking-wider">
-                  Ritual EVM++ Execution Model
+                  Ritual EVM++ Native Execution Model
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[
-                    { id: '0x0802', name: '0x0802 LLM Call', badge: 'Short-Running TEE', desc: 'Precompile 0x0802 LLM reasoning model' },
-                    { id: '0x080C', name: '0x080C Sovereign Agent', badge: 'Multi-Turn Agent', desc: 'Sovereign Agent with Python & Tools' },
-                    { id: '0x0820', name: '0x0820 Persistent Agent', badge: 'Autonomous 24/7', desc: 'Persistent Agent with DKMS & Heartbeat' },
-                    { id: '0x0801', name: '0x0801 HTTP Call', badge: 'Enshrined Oracle', desc: 'Hardware attested HTTP request' }
-                  ].map(m => {
-                    const isSelected = executionModel === m.id
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setExecutionModel(m.id)}
-                        className={`p-3 rounded-xl text-left border transition ${
-                          isSelected
-                            ? 'bg-[#6D5EF5]/15 border-[#6D5EF5] text-white shadow-lg shadow-[#6D5EF5]/20'
-                            : 'bg-white/[0.02] border-white/[0.08] hover:bg-white/[0.05] text-slate-300'
-                        }`}
-                      >
-                        <div className="font-bold text-xs flex items-center justify-between">
-                          <span>{m.name}</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-300">{m.badge}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-1">{m.desc}</div>
-                      </button>
-                    )
-                  })}
+                <div className="p-3.5 rounded-xl text-left border bg-[#6D5EF5]/15 border-[#6D5EF5] text-white shadow-lg shadow-[#6D5EF5]/20">
+                  <div className="font-bold text-xs flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      0x0802 LLM Call Precompile
+                    </span>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-[#6D5EF5]/40 text-purple-200 border border-[#6D5EF5]/50">
+                      Short-Running TEE Enclave
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 mt-1.5 font-mono">
+                    Model: <span className="text-purple-300 font-semibold">zai-org/GLM-4.7-FP8</span> | Hardware: <span className="text-emerald-300">AWS Nitro TEE</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1">
+                    Native 30-field ECIES encrypted prompt payload executed on Ritual Chain (ID 1979).
+                  </div>
                 </div>
               </div>
             </div>
