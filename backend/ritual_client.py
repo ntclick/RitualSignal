@@ -487,6 +487,64 @@ class RitualClient:
             'type': 2
         }
 
+        return tx_hex, latency_ms
+
+    def encode_sovereign_agent_payload(self, prompt: str, market_summary: str, ttl_blocks: int = 300) -> bytes:
+        """
+        Encodes ABI payload for Sovereign Agent Precompile (0x080C).
+        Capability 0 TEE Executor Node (0x7cEc336E46D8791fF9d9c5f7A5b8a6001ffD96d1).
+        """
+        exec_addr = to_checksum_address(self.get_tee_executor(capability=self.CAPABILITY_HTTP_CALL))
+        messages = [
+            {"role": "system", "content": f"[RITUAL SOVEREIGN AGENT 0x080C]\n{prompt}"},
+            {"role": "user", "content": market_summary}
+        ]
+        types = ['address', 'bytes[]', 'uint256', 'bytes[]', 'bytes', 'string', 'string']
+        values = [exec_addr, [], int(ttl_blocks), [], b'', json.dumps(messages), "sovereign-agent-v1"]
+        return encode(types, values)
+
+    def encode_persistent_agent_payload(self, prompt: str, market_summary: str, ttl_blocks: int = 300) -> bytes:
+        """
+        Encodes ABI payload for Persistent Agent Precompile (0x0820).
+        Capability 0 TEE Executor Node (0x7cEc336E46D8791fF9d9c5f7A5b8a6001ffD96d1).
+        """
+        exec_addr = to_checksum_address(self.get_tee_executor(capability=self.CAPABILITY_HTTP_CALL))
+        messages = [
+            {"role": "system", "content": f"[RITUAL PERSISTENT AGENT 0x0820]\n{prompt}"},
+            {"role": "user", "content": market_summary}
+        ]
+        types = ['address', 'bytes[]', 'uint256', 'bytes[]', 'bytes', 'string', 'string', 'uint256']
+        values = [exec_addr, [], int(ttl_blocks), [], b'', json.dumps(messages), "persistent-agent-v1", 0]
+        return encode(types, values)
+
+    def execute_agent_precompile(self, precompile_address: str, payload: bytes, gas_limit: int = 3_000_000) -> Tuple[str, int]:
+        """
+        Executes Sovereign Agent (0x080C) or Persistent Agent (0x0820) precompile on Ritual Chain.
+        """
+        if not self.account:
+            raise ValueError("Ritual client initialized without private key")
+
+        target = to_checksum_address(precompile_address)
+        n1 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'latest')
+        n2 = self.w3.eth.get_transaction_count(to_checksum_address(self.address), 'pending')
+        nonce = max(n1, n2)
+
+        base_fee = self.w3.eth.gas_price
+        priority_fee = self.w3.to_wei(2, 'gwei')
+        max_fee = int(base_fee * 2.5) + priority_fee
+
+        tx_dict = {
+            'from': self.address,
+            'to': target,
+            'data': payload,
+            'nonce': nonce,
+            'gas': gas_limit,
+            'maxFeePerGas': max_fee,
+            'maxPriorityFeePerGas': priority_fee,
+            'chainId': self.w3.eth.chain_id,
+            'type': 2
+        }
+
         t0 = time.time()
         signed_tx = self.w3.eth.account.sign_transaction(tx_dict, private_key=self.private_key)
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
