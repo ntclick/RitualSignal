@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { BackendWarmupProvider, useBackendWarmup } from './context/BackendWarmupContext'
 import { SignalResultTerminal } from './components/SignalResultTerminal'
+import { LandingHome } from './components/LandingHome'
 import { RitualLogo } from './components/RitualLogo'
 import { TransactionStatusService } from './services/TransactionStatusService'
 
@@ -139,6 +140,7 @@ function MainAppContent() {
   const { isWarmedUp, backendUrl } = useBackendWarmup()
   const activeBackendUrl = getSanitizedBackendUrl(backendUrl)
 
+  const [viewMode, setViewMode] = useState('landing') // 'landing' | 'app'
   const [activeNetwork, setActiveNetwork] = useState('ritual_testnet')
   const [selectedCoin, setSelectedCoin] = useState('BTC')
   const [coins, setCoins] = useState(PRESET_COINS)
@@ -630,6 +632,13 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
 
   const activeCoinObj = coins.find(c => c.sym === selectedCoin) || PRESET_COINS[0]
 
+  if (viewMode === 'landing') {
+    return <LandingHome onLaunchApp={() => {
+      setViewMode('app')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }} />
+  }
+
   return (
     <div className="min-h-screen bg-[#09090B] text-slate-100 font-body relative overflow-x-hidden">
       
@@ -639,7 +648,9 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
           
           {/* Logo & Network Tag */}
           <div className="flex items-center gap-6">
-            <RitualLogo size="medium" textSub="AI QUANT ORACLE" />
+            <div className="cursor-pointer" onClick={() => setViewMode('landing')}>
+              <RitualLogo size="medium" textSub="AI QUANT ORACLE" />
+            </div>
             <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08]">
               <span className="w-2 h-2 rounded-full bg-[#00D26A] animate-pulse" />
               <span className="font-mono text-xs font-medium text-slate-300">Ritual Chain (1979)</span>
@@ -647,7 +658,24 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
           </div>
 
           {/* Action & Wallet Controls */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setViewMode('landing')}
+              className="px-3.5 py-2 rounded-xl text-xs font-mono font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.08] transition"
+            >
+              Home Page
+            </button>
+
+            <a
+              href="https://github.com/ntclick/RitualSignal"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.08] transition"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-purple-400" />
+              <span>GitHub</span>
+            </a>
+
             {connectedWallet ? (
               <div className="flex items-center gap-3 bg-[#15151D] border border-white/[0.08] p-1.5 pl-4 rounded-xl">
                 <div className="flex flex-col text-right">
