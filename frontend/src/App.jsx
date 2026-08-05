@@ -643,7 +643,7 @@ const LOCAL_STORAGE_SESSION_SIG_KEY = 'ritualsignal_x402_session_sig'
     <div className="min-h-screen bg-[#09090B] text-slate-100 font-body relative overflow-x-hidden">
       
       {/* ── Top Header Navigation ──────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-[#09090B]/80 backdrop-blur-xl border-b border-white/[0.08]">
+      <header className="sticky top-0 z-50 bg-[#09090B]/95 backdrop-blur-2xl border-b border-white/[0.08] shadow-2xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           
           {/* Logo & Network Tag */}
