@@ -508,56 +508,28 @@ async def evaluate_signal(body: EvaluateRequest):
     clean_tx_hash = "0x" + uuid.uuid4().hex + uuid.uuid4().hex
     latency_ms = 350.0
 
-    exec_model = getattr(body, "execution_model", "0x0802") or "0x0802"
-
     try:
-        if exec_model == "0x0801":
-            # Target 0x0801 HTTP Call Precompile
-            eval_tx_hash, latency_ms = client.execute_http_precompile(
-                target_url=f"https://api.binance.com/api/v3/klines?symbol={symbol}USDT&interval={interval}&limit=60"
-            )
-        elif exec_model == "0x080C":
-            # Target 0x080C Sovereign Agent Precompile
-            agent_payload = client.encode_sovereign_agent_payload(
-                prompt=SIGNAL_RUBRIC_PROMPT,
-                market_summary=market_summary
-            )
-            eval_tx_hash, latency_ms = client.execute_agent_precompile(
-                precompile_address=client.SOVEREIGN_AGENT_PRECOMPILE,
-                payload=agent_payload
-            )
-        elif exec_model == "0x0820":
-            # Target 0x0820 Persistent Agent Precompile
-            agent_payload = client.encode_persistent_agent_payload(
-                prompt=SIGNAL_RUBRIC_PROMPT,
-                market_summary=market_summary
-            )
-            eval_tx_hash, latency_ms = client.execute_agent_precompile(
-                precompile_address=client.PERSISTENT_AGENT_PRECOMPILE,
-                payload=agent_payload
-            )
-        else:
-            # Default: Target 0x0802 LLM Call Precompile
-            payload = client.encode_llm_payload(
-                prompt=SIGNAL_RUBRIC_PROMPT,
-                market_summary=market_summary,
-                executor_address=TEE_EXECUTOR,
-                ttl_blocks=300
-            )
+        # Strictly target Ritual LLM Call Precompile (0x0802) via SignalOracle (0xCc5495dF...)
+        payload = client.encode_llm_payload(
+            prompt=SIGNAL_RUBRIC_PROMPT,
+            market_summary=market_summary,
+            executor_address=TEE_EXECUTOR,
+            ttl_blocks=300
+        )
 
-            eval_tx_hash, latency_ms = client.execute_oracle_evaluate(
-                oracle_address=ORACLE_ADDRESS,
-                oracle_abi=ORACLE_ABI,
-                llm_payload=payload,
-                request_id=request_id,
-                symbol=symbol,
-                pair=f"{symbol}/USDT"
-            )
+        eval_tx_hash, latency_ms = client.execute_oracle_evaluate(
+            oracle_address=ORACLE_ADDRESS,
+            oracle_abi=ORACLE_ABI,
+            llm_payload=payload,
+            request_id=request_id,
+            symbol=symbol,
+            pair=f"{symbol}/USDT"
+        )
 
         if eval_tx_hash:
             clean_tx_hash = eval_tx_hash if eval_tx_hash.startswith("0x") else "0x" + eval_tx_hash
     except Exception as e:
-        print(f"[EVALUATION EXCEPTION HANDLED for {exec_model}] {e}")
+        print(f"[0x0802 LLM EVALUATION EXCEPTION HANDLED] {e}")
 
     # Cache parameters for dynamic fallback
     cache_entry = {
