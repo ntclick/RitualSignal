@@ -84,19 +84,10 @@ export function LandingHome({ onLaunchApp }) {
           
           {/* Brand Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="relative">
-              <RitualLogo className="w-10 h-10 text-[#6D5EF5] drop-shadow-[0_0_15px_rgba(109,94,245,0.5)]" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#07090E] animate-pulse"></span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-bold font-mono tracking-tight text-white">Ritual<span className="text-[#6D5EF5]">Signal</span></span>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#6D5EF5]/20 text-[#6D5EF5] border border-[#6D5EF5]/30">
-                  EVM++ L1
-                </span>
-              </div>
-              <p className="text-[11px] font-mono text-slate-400">Verifiable AI Quant Oracle</p>
-            </div>
+            <RitualLogo size="medium" textSub="AI QUANT ORACLE" />
+            <span className="hidden sm:inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#6D5EF5]/20 text-[#6D5EF5] border border-[#6D5EF5]/30">
+              EVM++ L1
+            </span>
           </div>
 
           {/* Nav Items */}
